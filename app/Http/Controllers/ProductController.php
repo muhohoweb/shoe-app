@@ -129,7 +129,7 @@ class ProductController extends Controller
         foreach ($images as $image) {
             if (!$image) continue;
 
-            $path = $image->store('products', 'public');
+            $path = $image->store('uploads', 'public');
 
             $product->images()->create([
                 'path' => $path,
