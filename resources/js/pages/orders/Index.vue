@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { Edit, Trash2, Eye, Package } from 'lucide-vue-next';
+import { Edit, Trash2, Eye, Package, User, Phone, MapPin } from 'lucide-vue-next';
 import {
   Table,
   TableBody,
@@ -41,8 +41,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'vue-sonner'
-import { ref, computed } from 'vue'
-import Pagination from '@/components/Pagination.vue'
+import { ref, computed, watch } from 'vue'
+import draggable from 'vuedraggable'
 
 interface Item {
   id: number
@@ -51,10 +51,7 @@ interface Item {
   color: string | null
   price: number
   quantity: number
-  product?: {
-    id: number
-    name: string
-  }
+  product?: { id: number; name: string }
 }
 
 interface Order {
@@ -73,11 +70,10 @@ interface Order {
   created_at: string
 }
 
+type OrderStatus = Order['status']
+
 const props = defineProps<{
-  orders?: {
-    data: Order[]
-    links: any[]
-  }
+  orders?: { data: Order[]; links: any[] }
 }>()
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -85,20 +81,69 @@ const breadcrumbs: BreadcrumbItem[] = [
   { title: 'Orders' },
 ]
 
-const ordersList = computed(() => props.orders?.data || [])
-const paginationLinks = computed(() => props.orders?.links || [])
-
-const statusColors = {
-  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-  processing: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-}
+const columns: { key: OrderStatus; label: string; color: string; bg: string }[] = [
+  { key: 'pending', label: 'Pending', color: 'border-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/20' },
+  { key: 'processing', label: 'Processing', color: 'border-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+  { key: 'completed', label: 'Completed', color: 'border-green-400', bg: 'bg-green-50 dark:bg-green-900/20' },
+  { key: 'cancelled', label: 'Cancelled', color: 'border-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
+]
 
 const paymentStatusColors = {
   pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
   paid: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
   failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+}
+
+// Kanban state
+const kanbanData = ref<Record<OrderStatus, Order[]>>({
+  pending: [],
+  processing: [],
+  completed: [],
+  cancelled: [],
+})
+
+// Initialize kanban data from props
+const initializeKanban = () => {
+  const orders = props.orders?.data || []
+  kanbanData.value = {
+    pending: orders.filter(o => o.status === 'pending'),
+    processing: orders.filter(o => o.status === 'processing'),
+    completed: orders.filter(o => o.status === 'completed'),
+    cancelled: orders.filter(o => o.status === 'cancelled'),
+  }
+}
+
+initializeKanban()
+
+watch(() => props.orders, initializeKanban, { deep: true })
+
+const getColumnCount = (status: OrderStatus) => kanbanData.value[status].length
+
+// Handle drag end - update status on backend
+const onDragEnd = (status: OrderStatus) => {
+  return (evt: any) => {
+    if (evt.added) {
+      const order = evt.added.element as Order
+      if (order.status !== status) {
+        router.put(`/orders/${order.id}`, {
+          status,
+          payment_status: order.payment_status,
+          tracking_number: order.tracking_number,
+        }, {
+          preserveScroll: true,
+          onSuccess: () => {
+            toast.success('Order Updated', {
+              description: `Order #${order.uuid.slice(0, 8)} moved to ${status}.`,
+            })
+          },
+          onError: () => {
+            toast.error('Update Failed')
+            initializeKanban() // Revert on error
+          },
+        })
+      }
+    }
+  }
 }
 
 // ─── View Modal ─────────────────────────────────────────────────
@@ -137,12 +182,10 @@ const closeEditDialog = () => {
   isEditDialogOpen.value = false
   editingOrder.value = null
   editForm.reset()
-  editForm.clearErrors()
 }
 
 const handleEditSubmit = () => {
   if (!editingOrder.value) return
-
   editForm.put(`/orders/${editingOrder.value.id}`, {
     preserveScroll: true,
     onSuccess: () => {
@@ -151,11 +194,7 @@ const handleEditSubmit = () => {
       })
       closeEditDialog()
     },
-    onError: () => {
-      toast.error('Update Failed', {
-        description: 'Please check the form for errors.',
-      })
-    },
+    onError: () => toast.error('Update Failed'),
   })
 }
 
@@ -170,21 +209,14 @@ const openDeleteDialog = (order: Order) => {
 
 const handleDeleteConfirm = () => {
   if (!deletingOrder.value) return
-
   router.delete(`/orders/${deletingOrder.value.id}`, {
     preserveScroll: true,
     onSuccess: () => {
-      toast.success('Order Deleted', {
-        description: `Order #${deletingOrder.value?.uuid.slice(0, 8)} has been deleted.`,
-      })
+      toast.success('Order Deleted')
       isDeleteDialogOpen.value = false
       deletingOrder.value = null
     },
-    onError: () => {
-      toast.error('Delete Failed', {
-        description: 'Unable to delete order. Please try again.',
-      })
-    },
+    onError: () => toast.error('Delete Failed'),
   })
 }
 
@@ -195,11 +227,8 @@ const closeDeleteDialog = () => {
 
 const formatDate = (date: string) => {
   return new Date(date).toLocaleDateString('en-KE', {
-    year: 'numeric',
     month: 'short',
     day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
   })
 }
 </script>
@@ -208,110 +237,126 @@ const formatDate = (date: string) => {
   <Head title="Orders" />
 
   <AppLayout :breadcrumbs="breadcrumbs">
-    <div class="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
-      <div class="relative min-h-[100vh] flex-1 rounded-xl border border-gray-200 bg-white md:min-h-min dark:border-gray-700 dark:bg-gray-800">
-        <div class="p-6">
-          <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-xl font-semibold">Orders</h2>
+    <div class="flex h-full flex-1 flex-col gap-4 p-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-semibold">Orders Board</h2>
+      </div>
+
+      <!-- Kanban Board -->
+      <div class="flex gap-4 overflow-x-auto pb-4">
+        <div
+            v-for="column in columns"
+            :key="column.key"
+            class="flex-shrink-0 w-80"
+        >
+          <!-- Column Header -->
+          <div
+              class="rounded-t-lg border-t-4 px-3 py-2"
+              :class="[column.color, column.bg]"
+          >
+            <div class="flex items-center justify-between">
+              <h3 class="font-semibold text-sm uppercase tracking-wide">
+                {{ column.label }}
+              </h3>
+              <span class="rounded-full bg-white dark:bg-gray-800 px-2 py-0.5 text-xs font-medium">
+                {{ getColumnCount(column.key) }}
+              </span>
+            </div>
           </div>
 
-          <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>#</TableHead>
-                  <TableHead>Order ID</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Payment</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead class="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow v-if="ordersList.length === 0">
-                  <TableCell colspan="9" class="text-center text-gray-500 dark:text-gray-400 h-24">
-                    No orders found.
-                  </TableCell>
-                </TableRow>
-                <TableRow v-for="(order, index) in ordersList" :key="order.id">
-                  <TableCell class="font-medium">{{ index + 1 }}</TableCell>
-                  <TableCell class="font-mono text-sm">{{ order.uuid.slice(0, 8) }}</TableCell>
-                  <TableCell>
-                    <div>
-                      <div class="font-medium">{{ order.customer_name || 'N/A' }}</div>
-                      <div class="text-sm text-gray-500 dark:text-gray-400">{{ order.mpesa_number }}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell class="font-medium">KES {{ Number(order.amount).toLocaleString() }}</TableCell>
-                  <TableCell>
+          <!-- Column Body -->
+          <div
+              class="rounded-b-lg border border-t-0 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 min-h-[60vh]"
+          >
+            <draggable
+                v-model="kanbanData[column.key]"
+                group="orders"
+                item-key="id"
+                class="p-2 space-y-2 min-h-[60vh]"
+                ghost-class="opacity-50"
+                drag-class="rotate-2"
+                @change="onDragEnd(column.key)"
+            >
+              <template #item="{ element: order }">
+                <div
+                    class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing"
+                >
+                  <!-- Card Header -->
+                  <div class="flex items-start justify-between mb-2">
+                    <span class="font-mono text-xs text-gray-500 dark:text-gray-400">
+                      #{{ order.uuid.slice(0, 8) }}
+                    </span>
                     <span
-                        class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
+                        class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
                         :class="paymentStatusColors[order.payment_status]"
                     >
                       {{ order.payment_status }}
                     </span>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                        class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
-                        :class="statusColors[order.status]"
-                    >
-                      {{ order.status }}
+                  </div>
+
+                  <!-- Customer Info -->
+                  <div class="space-y-1 mb-3">
+                    <div class="flex items-center gap-2 text-sm">
+                      <User class="h-3.5 w-3.5 text-gray-400" />
+                      <span class="font-medium truncate">{{ order.customer_name || 'N/A' }}</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      <Phone class="h-3 w-3" />
+                      <span>{{ order.mpesa_number }}</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      <MapPin class="h-3 w-3" />
+                      <span>{{ order.town }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Amount & Items -->
+                  <div class="flex items-center justify-between mb-3">
+                    <span class="font-semibold text-sm">
+                      KES {{ Number(order.amount).toLocaleString() }}
                     </span>
-                  </TableCell>
-                  <TableCell>
-                    <span class="inline-flex items-center gap-1">
-                      <Package class="h-4 w-4 text-gray-400" />
-                      {{ order.items?.length || 0 }}
+                    <span class="inline-flex items-center gap-1 text-xs text-gray-500">
+                      <Package class="h-3 w-3" />
+                      {{ order.items?.length || 0 }} items
                     </span>
-                  </TableCell>
-                  <TableCell class="text-sm text-gray-500 dark:text-gray-400">
-                    {{ formatDate(order.created_at) }}
-                  </TableCell>
-                  <TableCell class="text-right">
-                    <div class="flex items-center justify-end gap-2">
+                  </div>
+
+                  <!-- Card Footer -->
+                  <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
+                    <span class="text-xs text-gray-400">{{ formatDate(order.created_at) }}</span>
+                    <div class="flex items-center gap-1">
                       <button
-                          @click="openViewDialog(order)"
-                          class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                          @click.stop="openViewDialog(order)"
+                          class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                          title="View"
                       >
-                        <Eye class="h-4 w-4" />
-                        View
+                        <Eye class="h-4 w-4 text-gray-500" />
                       </button>
                       <button
-                          @click="openEditDialog(order)"
-                          class="inline-flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:hover:bg-blue-800"
+                          @click.stop="openEditDialog(order)"
+                          class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                          title="Edit"
                       >
-                        <Edit class="h-4 w-4" />
-                        Edit
+                        <Edit class="h-4 w-4 text-blue-500" />
                       </button>
                       <button
-                          @click="openDeleteDialog(order)"
-                          class="inline-flex items-center gap-1 rounded-md bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-200 dark:hover:bg-red-800"
+                          @click.stop="openDeleteDialog(order)"
+                          class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                          title="Delete"
                       >
-                        <Trash2 class="h-4 w-4" />
-                        Delete
+                        <Trash2 class="h-4 w-4 text-red-500" />
                       </button>
                     </div>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </div>
-
-          <div class="mt-4 flex items-center justify-between">
-            <div class="text-sm text-gray-500 dark:text-gray-400">
-              Showing {{ ordersList.length }} orders on this page
-            </div>
-            <Pagination :links="paginationLinks" />
+                  </div>
+                </div>
+              </template>
+            </draggable>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ─── View Order Dialog ───────────────────────────────────── -->
+    <!-- View Dialog (same as before) -->
     <Dialog v-model:open="isViewDialogOpen">
       <DialogContent class="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -332,7 +377,6 @@ const formatDate = (date: string) => {
               <p class="font-medium">{{ viewingOrder.mpesa_number }}</p>
             </div>
           </div>
-
           <div class="grid grid-cols-2 gap-4">
             <div>
               <Label class="text-muted-foreground">Amount</Label>
@@ -343,28 +387,6 @@ const formatDate = (date: string) => {
               <p class="font-medium font-mono">{{ viewingOrder.mpesa_code || 'N/A' }}</p>
             </div>
           </div>
-
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <Label class="text-muted-foreground">Payment Status</Label>
-              <span
-                  class="inline-flex rounded-full px-2 py-1 text-xs font-semibold mt-1"
-                  :class="paymentStatusColors[viewingOrder.payment_status]"
-              >
-                {{ viewingOrder.payment_status }}
-              </span>
-            </div>
-            <div>
-              <Label class="text-muted-foreground">Order Status</Label>
-              <span
-                  class="inline-flex rounded-full px-2 py-1 text-xs font-semibold mt-1"
-                  :class="statusColors[viewingOrder.status]"
-              >
-                {{ viewingOrder.status }}
-              </span>
-            </div>
-          </div>
-
           <div class="grid grid-cols-2 gap-4">
             <div>
               <Label class="text-muted-foreground">Town</Label>
@@ -375,16 +397,13 @@ const formatDate = (date: string) => {
               <p class="font-medium font-mono">{{ viewingOrder.tracking_number || 'N/A' }}</p>
             </div>
           </div>
-
           <div>
             <Label class="text-muted-foreground">Description</Label>
             <p class="text-sm mt-1">{{ viewingOrder.description }}</p>
           </div>
-
-          <!-- Order Items -->
           <div v-if="viewingOrder.items && viewingOrder.items.length > 0">
             <Label class="text-muted-foreground mb-2 block">Items ({{ viewingOrder.items.length }})</Label>
-            <div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="rounded-lg border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -408,14 +427,13 @@ const formatDate = (date: string) => {
             </div>
           </div>
         </div>
-
         <DialogFooter>
           <Button variant="outline" @click="closeViewDialog">Close</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
 
-    <!-- ─── Edit Order Dialog ───────────────────────────────────── -->
+    <!-- Edit Dialog -->
     <Dialog v-model:open="isEditDialogOpen">
       <DialogContent class="sm:max-w-[450px]" @interact-outside="(e) => e.preventDefault()">
         <DialogHeader>
@@ -424,15 +442,12 @@ const formatDate = (date: string) => {
             Order #{{ editingOrder.uuid.slice(0, 8) }}
           </DialogDescription>
         </DialogHeader>
-
         <form @submit.prevent="handleEditSubmit">
           <div class="grid gap-4 py-4">
             <div class="grid gap-2">
-              <Label for="edit-status">Order Status</Label>
+              <Label>Order Status</Label>
               <Select v-model="editForm.status" required>
-                <SelectTrigger id="edit-status">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="processing">Processing</SelectItem>
@@ -441,13 +456,10 @@ const formatDate = (date: string) => {
                 </SelectContent>
               </Select>
             </div>
-
             <div class="grid gap-2">
-              <Label for="edit-payment-status">Payment Status</Label>
+              <Label>Payment Status</Label>
               <Select v-model="editForm.payment_status" required>
-                <SelectTrigger id="edit-payment-status">
-                  <SelectValue placeholder="Select payment status" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select payment status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
@@ -455,17 +467,11 @@ const formatDate = (date: string) => {
                 </SelectContent>
               </Select>
             </div>
-
             <div class="grid gap-2">
-              <Label for="edit-tracking">Tracking Number</Label>
-              <Input
-                  id="edit-tracking"
-                  v-model="editForm.tracking_number"
-                  placeholder="Enter tracking number"
-              />
+              <Label>Tracking Number</Label>
+              <Input v-model="editForm.tracking_number" placeholder="Enter tracking number" />
             </div>
           </div>
-
           <DialogFooter>
             <Button type="button" variant="outline" @click="closeEditDialog">Cancel</Button>
             <Button type="submit" :disabled="editForm.processing">Save Changes</Button>
@@ -474,7 +480,7 @@ const formatDate = (date: string) => {
       </DialogContent>
     </Dialog>
 
-    <!-- ─── Delete Order Alert Dialog ───────────────────────────── -->
+    <!-- Delete Dialog -->
     <AlertDialog v-model:open="isDeleteDialogOpen">
       <AlertDialogContent>
         <AlertDialogHeader>
