@@ -106,3 +106,6 @@
 <!--        </Form>-->
 <!--    </AuthBase>-->
 <!--</template>-->
+<template>
+  <div></div>
+</template>
