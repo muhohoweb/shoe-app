@@ -13,17 +13,41 @@ defineProps<Props>();
 </script>
 
 <template>
-    <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 40 42"
-        :class="className"
-        v-bind="$attrs"
-    >
-        <path
-            fill="currentColor"
-            fill-rule="evenodd"
-            clip-rule="evenodd"
-            d="M17.2 5.633 8.6.855 0 5.633v26.51l16.2 9 16.2-9v-8.442l7.6-4.223V9.856l-8.6-4.777-8.6 4.777V18.3l-5.6 3.111V5.633ZM38 18.301l-5.6 3.11v-6.157l5.6-3.11V18.3Zm-1.06-7.856-5.54 3.078-5.54-3.079 5.54-3.078 5.54 3.079ZM24.8 18.3v-6.157l5.6 3.111v6.158L24.8 18.3Zm-1 1.732 5.54 3.078-13.14 7.302-5.54-3.078 13.14-7.3v-.002Zm-16.2 7.89 7.6 4.222V38.3L2 30.966V7.92l5.6 3.111v16.892ZM8.6 9.3 3.06 6.222 8.6 3.143l5.54 3.08L8.6 9.3Zm21.8 15.51-13.2 7.334V38.3l13.2-7.334v-6.156ZM9.6 11.034l5.6-3.11v14.6l-5.6 3.11v-14.6Z"
-        />
-    </svg>
+  <svg
+      viewBox="0 0 100 100"
+      xmlns="http://www.w3.org/2000/svg"
+      class="handmade-shoe-icon"
+      style="width: 100%; max-width: 300px; height: auto;"
+  >
+    <circle cx="50" cy="50" r="48" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+
+    <path
+        d="M20 70 C 20 60, 30 55, 45 55 C 60 55, 85 60, 85 75 C 85 82, 75 85, 45 85 C 25 85, 20 80, 20 70 Z"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+    />
+    <path d="M25 70 L 80 78" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2" opacity="0.5"/>
+
+    <path
+        d="M65 45 C 60 45, 55 40, 55 35 C 55 30, 60 25, 70 25 C 80 25, 85 35, 85 40 L 80 55 L 70 50 Z"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linejoin="round"
+    />
+
+    <line x1="68" y1="52" x2="58" y2="65" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+
+    <path
+        d="M58 65 C 50 75, 40 65, 35 60"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1"
+        stroke-dasharray="3 2"
+    />
+
+    <path d="M22 78 L 35 82" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  </svg>
 </template>
