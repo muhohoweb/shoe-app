@@ -683,7 +683,7 @@ const closeDeleteDialog = () => {
                     :key="'existing-' + img.id"
                     class="group relative aspect-square overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700"
                 >
-                  <img :src="'/storage/' + img.path" alt="Product" class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                  <img :src="'/' + img.path" alt="Product" class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                   <div class="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/40" />
                   <button
                       type="button"
