@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {Link} from '@inertiajs/vue3';
-import {BookOpen, Folder, LayoutGrid} from 'lucide-vue-next';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -20,6 +19,8 @@ import categories from "@/routes/categories";
 import products from "@/routes/products";
 import orders from "@/routes/orders";
 
+import { LayoutGrid, FolderTree, Package, ShoppingCart, Folder, BookOpen } from 'lucide-vue-next';
+
 const mainNavItems: NavItem[] = [
   {
     title: 'Dashboard',
@@ -29,17 +30,17 @@ const mainNavItems: NavItem[] = [
   {
     title: 'Categories',
     href: categories.index(),
-    icon: LayoutGrid,
+    icon: FolderTree,
   },
   {
     title: 'Products',
     href: products.index(),
-    icon: LayoutGrid,
+    icon: Package,
   },
   {
     title: 'Orders',
     href: orders.index(),
-    icon: LayoutGrid,
+    icon: ShoppingCart,
   },
 ];
 
