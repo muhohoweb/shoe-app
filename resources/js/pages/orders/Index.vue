@@ -88,7 +88,7 @@ const columns: { key: OrderStatus; label: string; color: string; bg: string }[] 
   { key: 'cancelled', label: 'Cancelled', color: 'border-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
 ]
 
-const paymentStatusColors = {
+const paymentStatusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
   paid: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
   failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
@@ -102,14 +102,13 @@ const kanbanData = ref<Record<OrderStatus, Order[]>>({
   cancelled: [],
 })
 
-// Initialize kanban data from props
 const initializeKanban = () => {
   const orders = props.orders?.data || []
   kanbanData.value = {
-    pending: orders.filter(o => o.status === 'pending'),
-    processing: orders.filter(o => o.status === 'processing'),
-    completed: orders.filter(o => o.status === 'completed'),
-    cancelled: orders.filter(o => o.status === 'cancelled'),
+    pending: [...orders.filter(o => o.status === 'pending')],
+    processing: [...orders.filter(o => o.status === 'processing')],
+    completed: [...orders.filter(o => o.status === 'completed')],
+    cancelled: [...orders.filter(o => o.status === 'cancelled')],
   }
 }
 
@@ -119,30 +118,26 @@ watch(() => props.orders, initializeKanban, { deep: true })
 
 const getColumnCount = (status: OrderStatus) => kanbanData.value[status].length
 
-// Handle drag end - update status on backend
-const onDragEnd = (status: OrderStatus) => {
-  return (evt: any) => {
-    if (evt.added) {
-      const order = evt.added.element as Order
-      if (order.status !== status) {
-        router.put(`/orders/${order.id}`, {
-          status,
-          payment_status: order.payment_status,
-          tracking_number: order.tracking_number,
-        }, {
-          preserveScroll: true,
-          onSuccess: () => {
-            toast.success('Order Updated', {
-              description: `Order #${order.uuid.slice(0, 8)} moved to ${status}.`,
-            })
-          },
-          onError: () => {
-            toast.error('Update Failed')
-            initializeKanban() // Revert on error
-          },
+const handleDragChange = (newStatus: OrderStatus, evt: any) => {
+  if (evt.added) {
+    const order = evt.added.element as Order
+
+    router.put(`/orders/${order.id}`, {
+      status: newStatus,
+      payment_status: order.payment_status,
+      tracking_number: order.tracking_number || '',
+    }, {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.success('Order Updated', {
+          description: `Order moved to ${newStatus}.`,
         })
-      }
-    }
+      },
+      onError: () => {
+        toast.error('Update Failed')
+        initializeKanban()
+      },
+    })
   }
 }
 
@@ -189,9 +184,7 @@ const handleEditSubmit = () => {
   editForm.put(`/orders/${editingOrder.value.id}`, {
     preserveScroll: true,
     onSuccess: () => {
-      toast.success('Order Updated', {
-        description: `Order #${editingOrder.value?.uuid.slice(0, 8)} has been updated.`,
-      })
+      toast.success('Order Updated')
       closeEditDialog()
     },
     onError: () => toast.error('Update Failed'),
@@ -243,15 +236,15 @@ const formatDate = (date: string) => {
       </div>
 
       <!-- Kanban Board -->
-      <div class="flex gap-4 overflow-x-auto pb-4">
+      <div class="grid grid-cols-4 gap-4 flex-1">
         <div
             v-for="column in columns"
             :key="column.key"
-            class="flex-shrink-0 w-80"
+            class="flex flex-col min-h-0"
         >
           <!-- Column Header -->
           <div
-              class="rounded-t-lg border-t-4 px-3 py-2"
+              class="rounded-t-lg border-t-4 px-3 py-2 flex-shrink-0"
               :class="[column.color, column.bg]"
           >
             <div class="flex items-center justify-between">
@@ -265,22 +258,18 @@ const formatDate = (date: string) => {
           </div>
 
           <!-- Column Body -->
-          <div
-              class="rounded-b-lg border border-t-0 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 min-h-[60vh]"
-          >
+          <div class="flex-1 rounded-b-lg border border-t-0 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-y-auto">
             <draggable
                 v-model="kanbanData[column.key]"
                 group="orders"
                 item-key="id"
-                class="p-2 space-y-2 min-h-[60vh]"
+                class="p-2 space-y-2 min-h-full"
                 ghost-class="opacity-50"
                 drag-class="rotate-2"
-                @change="onDragEnd(column.key)"
+                @change="(evt: any) => handleDragChange(column.key, evt)"
             >
               <template #item="{ element: order }">
-                <div
-                    class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing"
-                >
+                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing">
                   <!-- Card Header -->
                   <div class="flex items-start justify-between mb-2">
                     <span class="font-mono text-xs text-gray-500 dark:text-gray-400">
@@ -356,7 +345,7 @@ const formatDate = (date: string) => {
       </div>
     </div>
 
-    <!-- View Dialog (same as before) -->
+    <!-- View Dialog -->
     <Dialog v-model:open="isViewDialogOpen">
       <DialogContent class="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -435,7 +424,7 @@ const formatDate = (date: string) => {
 
     <!-- Edit Dialog -->
     <Dialog v-model:open="isEditDialogOpen">
-      <DialogContent class="sm:max-w-[450px]" @interact-outside="(e) => e.preventDefault()">
+      <DialogContent class="sm:max-w-[450px]" @interact-outside="(e: Event) => e.preventDefault()">
         <DialogHeader>
           <DialogTitle>Update Order</DialogTitle>
           <DialogDescription v-if="editingOrder">
