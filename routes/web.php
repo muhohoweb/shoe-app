@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ShopController;
 use Illuminate\Support\Facades\Route;
@@ -34,5 +35,8 @@ Route::delete('/products/{id}', [ProductController::class, 'destroy'])->name('pr
 // Public Shop Routes (no auth)
 Route::get('/shop', [ShopController::class, 'index'])->name('shop.index');
 Route::post('/shop/order', [ShopController::class, 'placeOrder'])->name('shop.order');
+
+
+Route::resource('orders', OrderController::class)->only(['index', 'update', 'destroy']);
 
 require __DIR__.'/settings.php';

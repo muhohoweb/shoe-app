@@ -18,6 +18,7 @@ import {type NavItem} from '@/types';
 import AppLogo from './AppLogo.vue';
 import categories from "@/routes/categories";
 import products from "@/routes/products";
+import orders from "@/routes/orders";
 
 const mainNavItems: NavItem[] = [
   {
@@ -33,6 +34,11 @@ const mainNavItems: NavItem[] = [
   {
     title: 'Products',
     href: products.index(),
+    icon: LayoutGrid,
+  },
+  {
+    title: 'Orders',
+    href: orders.index(),
     icon: LayoutGrid,
   },
 ];
