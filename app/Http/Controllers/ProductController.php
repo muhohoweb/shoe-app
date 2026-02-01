@@ -10,6 +10,9 @@ use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
+    // Base upload path - update this to match your server
+    private $uploadBasePath = '/home/medicar2/domains/drmorch.medicareers.co.ke/public_html/uploads';
+
     public function index()
     {
         return Inertia::render('products/Index', [
@@ -100,7 +103,7 @@ class ProductController extends Controller
             $removedImages = $product->images()->whereIn('id', $validated['removed_image_ids'])->get();
             foreach ($removedImages as $image) {
                 // Delete from public_html/uploads directory
-                $imagePath = public_path('uploads/' . basename($image->path));
+                $imagePath = $this->uploadBasePath . '/' . basename($image->path);
                 if (file_exists($imagePath)) {
                     unlink($imagePath);
                 }
@@ -120,7 +123,7 @@ class ProductController extends Controller
 
         // Delete images from public_html/uploads directory before deleting the product
         foreach ($product->images as $image) {
-            $imagePath = public_path('uploads/' . basename($image->path));
+            $imagePath = $this->uploadBasePath . '/' . basename($image->path);
             if (file_exists($imagePath)) {
                 unlink($imagePath);
             }
@@ -133,7 +136,8 @@ class ProductController extends Controller
 
     private function uploadImages(Product $product, array $images): void
     {
-        $uploadPath = public_path('uploads');
+        // Use absolute path to public_html/uploads
+        $uploadPath = $this->uploadBasePath;
 
         // Ensure the uploads directory exists
         if (!file_exists($uploadPath)) {
@@ -146,10 +150,10 @@ class ProductController extends Controller
             // Generate unique filename
             $filename = time() . '_' . Str::random(20) . '.' . $image->getClientOriginalExtension();
 
-            // Move the file to public_html/uploads
+            // Move the file to public_html/uploads using absolute path
             $image->move($uploadPath, $filename);
 
-            // Store relative path in database (just the filename or relative path from public)
+            // Store relative path in database for URL generation
             $relativePath = 'uploads/' . $filename;
 
             $product->images()->create([
