@@ -16,11 +16,17 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import AppLogo from './AppLogo.vue';
+import categories from "@/routes/categories";
 
 const mainNavItems: NavItem[] = [
     {
         title: 'Dashboard',
         href: dashboard(),
+        icon: LayoutGrid,
+    },
+  {
+        title: 'Categories',
+        href: categories.index(),
         icon: LayoutGrid,
     },
 ];
