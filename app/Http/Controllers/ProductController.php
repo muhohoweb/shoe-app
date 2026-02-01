@@ -99,13 +99,17 @@ class ProductController extends Controller
         if (!empty($validated['removed_image_ids'])) {
             $removedImages = $product->images()->whereIn('id', $validated['removed_image_ids'])->get();
             foreach ($removedImages as $image) {
-                \Illuminate\Support\Facades\Storage::disk('public')->delete($image->path);
+                // Delete from public_html/uploads directory
+                $imagePath = public_path('uploads/' . basename($image->path));
+                if (file_exists($imagePath)) {
+                    unlink($imagePath);
+                }
             }
             $product->images()->whereIn('id', $validated['removed_image_ids'])->delete();
         }
 
         // Upload new images
-        $this->uploadImages($product, $request->file('images') || []);
+        $this->uploadImages($product, $request->file('images') ?? []);
 
         return redirect()->route('products.index');
     }
@@ -114,9 +118,12 @@ class ProductController extends Controller
     {
         $product = Product::query()->findOrFail($id);
 
-        // Delete images from disk before deleting the product
+        // Delete images from public_html/uploads directory before deleting the product
         foreach ($product->images as $image) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($image->path);
+            $imagePath = public_path('uploads/' . basename($image->path));
+            if (file_exists($imagePath)) {
+                unlink($imagePath);
+            }
         }
 
         $product->delete();
@@ -126,13 +133,27 @@ class ProductController extends Controller
 
     private function uploadImages(Product $product, array $images): void
     {
+        $uploadPath = public_path('uploads');
+
+        // Ensure the uploads directory exists
+        if (!file_exists($uploadPath)) {
+            mkdir($uploadPath, 0755, true);
+        }
+
         foreach ($images as $image) {
             if (!$image) continue;
 
-            $path = $image->store('uploads', 'public');
+            // Generate unique filename
+            $filename = time() . '_' . Str::random(20) . '.' . $image->getClientOriginalExtension();
+
+            // Move the file to public_html/uploads
+            $image->move($uploadPath, $filename);
+
+            // Store relative path in database (just the filename or relative path from public)
+            $relativePath = 'uploads/' . $filename;
 
             $product->images()->create([
-                'path' => $path,
+                'path' => $relativePath,
             ]);
         }
     }
