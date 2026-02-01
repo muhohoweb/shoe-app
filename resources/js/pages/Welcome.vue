@@ -304,7 +304,7 @@ onMounted(() => {
       </button>
 
       <!-- Image -->
-      <div style="aspect-ratio: 16/9; background: var(--cream-dark); overflow: hidden;">
+      <div style="aspect-ratio: 4/3; max-height: 280px; background: var(--cream-dark); overflow: hidden;">
         <img
             v-if="getProductImage(selectedProduct)"
             :src="getProductImage(selectedProduct)"
