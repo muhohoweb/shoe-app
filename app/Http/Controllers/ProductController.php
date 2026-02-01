@@ -10,8 +10,12 @@ use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
-    // Base upload path - update this to match your server
-    private $uploadBasePath = '/home/medicar2/domains/drmorch.medicareers.co.ke/public_html/uploads';
+    // Simple dynamic upload path
+    private function getUploadPath()
+    {
+        // Based on your server output, this will work for ALL your subdomains
+        return $_SERVER['DOCUMENT_ROOT'] . '/uploads';
+    }
 
     public function index()
     {
@@ -98,12 +102,12 @@ class ProductController extends Controller
             'slug' => $validated['slug'] ?? $product->slug,
         ]);
 
-        // Delete removed images from disk and DB
+        // Delete removed images
         if (!empty($validated['removed_image_ids'])) {
+            $uploadPath = $this->getUploadPath();
             $removedImages = $product->images()->whereIn('id', $validated['removed_image_ids'])->get();
             foreach ($removedImages as $image) {
-                // Delete from public_html/uploads directory
-                $imagePath = $this->uploadBasePath . '/' . basename($image->path);
+                $imagePath = $uploadPath . '/' . basename($image->path);
                 if (file_exists($imagePath)) {
                     unlink($imagePath);
                 }
@@ -120,10 +124,11 @@ class ProductController extends Controller
     public function destroy(string $id)
     {
         $product = Product::query()->findOrFail($id);
+        $uploadPath = $this->getUploadPath();
 
-        // Delete images from public_html/uploads directory before deleting the product
+        // Delete images
         foreach ($product->images as $image) {
-            $imagePath = $this->uploadBasePath . '/' . basename($image->path);
+            $imagePath = $uploadPath . '/' . basename($image->path);
             if (file_exists($imagePath)) {
                 unlink($imagePath);
             }
@@ -136,10 +141,9 @@ class ProductController extends Controller
 
     private function uploadImages(Product $product, array $images): void
     {
-        // Use absolute path to public_html/uploads
-        $uploadPath = $this->uploadBasePath;
+        $uploadPath = $this->getUploadPath();
 
-        // Ensure the uploads directory exists
+        // Ensure directory exists
         if (!file_exists($uploadPath)) {
             mkdir($uploadPath, 0755, true);
         }
@@ -147,13 +151,11 @@ class ProductController extends Controller
         foreach ($images as $image) {
             if (!$image) continue;
 
-            // Generate unique filename
             $filename = time() . '_' . Str::random(20) . '.' . $image->getClientOriginalExtension();
 
-            // Move the file to public_html/uploads using absolute path
             $image->move($uploadPath, $filename);
 
-            // Store relative path in database for URL generation
+            // Store relative path (just filename for URL)
             $relativePath = 'uploads/' . $filename;
 
             $product->images()->create([
