@@ -81,11 +81,11 @@ const breadcrumbs: BreadcrumbItem[] = [
   { title: 'Orders' },
 ]
 
-const columns: { key: OrderStatus; label: string; color: string; bg: string }[] = [
-  { key: 'pending', label: 'Pending', color: 'border-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/20' },
-  { key: 'processing', label: 'Processing', color: 'border-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-  { key: 'completed', label: 'Completed', color: 'border-green-400', bg: 'bg-green-50 dark:bg-green-900/20' },
-  { key: 'cancelled', label: 'Cancelled', color: 'border-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
+const columns: { key: OrderStatus; label: string; color: string; bg: string; hoverBg: string }[] = [
+  { key: 'pending', label: 'Pending', color: 'border-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/20', hoverBg: 'bg-yellow-100/50 dark:bg-yellow-900/40' },
+  { key: 'processing', label: 'Processing', color: 'border-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20', hoverBg: 'bg-blue-100/50 dark:bg-blue-900/40' },
+  { key: 'completed', label: 'Completed', color: 'border-green-400', bg: 'bg-green-50 dark:bg-green-900/20', hoverBg: 'bg-green-100/50 dark:bg-green-900/40' },
+  { key: 'cancelled', label: 'Cancelled', color: 'border-red-400', bg: 'bg-red-50 dark:bg-red-900/20', hoverBg: 'bg-red-100/50 dark:bg-red-900/40' },
 ]
 
 const paymentStatusColors: Record<string, string> = {
@@ -93,6 +93,9 @@ const paymentStatusColors: Record<string, string> = {
   paid: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
   failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
 }
+
+// Drag state
+const isDragging = ref(false)
 
 // Kanban state
 const kanbanData = ref<Record<OrderStatus, Order[]>>({
@@ -117,6 +120,14 @@ initializeKanban()
 watch(() => props.orders, initializeKanban, { deep: true })
 
 const getColumnCount = (status: OrderStatus) => kanbanData.value[status].length
+
+const handleDragStart = () => {
+  isDragging.value = true
+}
+
+const handleDragEnd = () => {
+  isDragging.value = false
+}
 
 const handleDragChange = (newStatus: OrderStatus, evt: any) => {
   if (evt.added) {
@@ -244,7 +255,7 @@ const formatDate = (date: string) => {
         >
           <!-- Column Header -->
           <div
-              class="rounded-t-lg border-t-4 px-3 py-2 flex-shrink-0"
+              class="rounded-t-lg border-t-4 px-3 py-2 flex-shrink-0 transition-colors duration-200"
               :class="[column.color, column.bg]"
           >
             <div class="flex items-center justify-between">
@@ -258,18 +269,28 @@ const formatDate = (date: string) => {
           </div>
 
           <!-- Column Body -->
-          <div class="flex-1 rounded-b-lg border border-t-0 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-y-auto">
+          <div
+              class="flex-1 rounded-b-lg border border-t-0 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-y-auto transition-all duration-200"
+              :class="{
+              'ring-2 ring-primary/50 ring-inset': isDragging,
+              [column.hoverBg]: isDragging,
+            }"
+          >
             <draggable
                 v-model="kanbanData[column.key]"
                 group="orders"
                 item-key="id"
                 class="p-2 space-y-2 min-h-full"
-                ghost-class="opacity-50"
-                drag-class="rotate-2"
+                ghost-class="kanban-ghost"
+                drag-class="kanban-drag"
+                chosen-class="kanban-chosen"
+                animation="200"
+                @start="handleDragStart"
+                @end="handleDragEnd"
                 @change="(evt: any) => handleDragChange(column.key, evt)"
             >
               <template #item="{ element: order }">
-                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing">
+                <div class="kanban-card bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing">
                   <!-- Card Header -->
                   <div class="flex items-start justify-between mb-2">
                     <span class="font-mono text-xs text-gray-500 dark:text-gray-400">
@@ -490,3 +511,36 @@ const formatDate = (date: string) => {
     </AlertDialog>
   </AppLayout>
 </template>
+
+<style>
+/* Ghost element - placeholder where item will be dropped */
+.kanban-ghost {
+  opacity: 0.4;
+  background: hsl(var(--primary) / 0.1) !important;
+  border: 2px dashed hsl(var(--primary)) !important;
+  border-radius: 0.5rem;
+}
+
+/* The element being dragged */
+.kanban-drag {
+  opacity: 1 !important;
+  transform: rotate(3deg) scale(1.02);
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.15), 0 8px 10px -6px rgb(0 0 0 / 0.15) !important;
+  z-index: 9999;
+}
+
+/* The chosen element before dragging starts */
+.kanban-chosen {
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+}
+
+/* Smooth transitions for cards moving out of the way */
+.kanban-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Sortable animation for items moving */
+.sortable-ghost {
+  opacity: 0;
+}
+</style>
