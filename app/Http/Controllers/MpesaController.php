@@ -27,7 +27,22 @@ class MpesaController extends Controller
     public function queryBalance()
     {
         try {
-            $response = Mpesa::accountbalance();
+
+            $shortcode = env('MPESA_BUSINESS_SHORTCODE');
+            $identiertype = 4;
+            $remarks = "ONLINE CHECK BALANCE";
+            $result_url = env('MPESA_BALANCE_TIMEOUT_URL');
+            $timeout_url = env('MPESA_BALANCE_TIMEOUT_URL');
+            $shortCodeType = "";
+
+            $response = Mpesa::accountbalance(
+                $shortcode,
+                $identiertype,
+                $remarks,
+                $result_url,
+                $timeout_url,
+                $shortCodeType
+            );
             $result = $response->json();
 
             Log::info('M-Pesa Balance Query Response', $result);
