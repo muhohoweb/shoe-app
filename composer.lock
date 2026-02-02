@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b6872ae9fb27b3165f0db93c5d75f21f",
+    "content-hash": "72a40146166637c5ba81cfc0b87c1b6a",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -1156,6 +1156,72 @@
                 }
             ],
             "time": "2025-08-22T14:27:06+00:00"
+        },
+        {
+            "name": "iankumu/mpesa",
+            "version": "2.2.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Iankumu/mpesa.git",
+                "reference": "c2c14210bab0ec17bb9931fa9daff074386dfe47"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Iankumu/mpesa/zipball/c2c14210bab0ec17bb9931fa9daff074386dfe47",
+                "reference": "c2c14210bab0ec17bb9931fa9daff074386dfe47",
+                "shasum": ""
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.5",
+                "illuminate/http": "^10.0 | ^11.0 | ^12.0",
+                "illuminate/support": "^10.0 | ^11.0 | ^12.0",
+                "php": "^8.2 | ^8.3 | ^8.4"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^8.0 |^9.0 | ^10.0",
+                "pestphp/pest": "^2.3| ^3.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "Mpesa": "Iankumu\\Mpesa\\Facades\\Mpesa"
+                    },
+                    "providers": [
+                        "Iankumu\\Mpesa\\MpesaServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Iankumu\\Mpesa\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Ian Kumu",
+                    "email": "ian@iankumu.com",
+                    "homepage": "https://www.iankumu.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A package that helps integrate the Mpesa APIs to your Laravel Project",
+            "homepage": "https://github.com/Iankumu/mpesa",
+            "keywords": [
+                "laravel",
+                "laravel mpesa",
+                "laravel-mpesa",
+                "mpesa"
+            ],
+            "support": {
+                "issues": "https://github.com/Iankumu/mpesa/issues",
+                "source": "https://github.com/Iankumu/mpesa/tree/2.2.1"
+            },
+            "time": "2025-08-15T09:39:36+00:00"
         },
         {
             "name": "inertiajs/inertia-laravel",
@@ -3758,6 +3824,49 @@
                 "source": "https://github.com/ramsey/uuid/tree/4.9.2"
             },
             "time": "2025-12-14T04:43:48+00:00"
+        },
+        {
+            "name": "safaricom/mpesa",
+            "version": "1.0.8",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/safaricom/mpesa-php-sdk.git",
+                "reference": "c66895dcdec8df1f496e017708c557fc252340c5"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/safaricom/mpesa-php-sdk/zipball/c66895dcdec8df1f496e017708c557fc252340c5",
+                "reference": "c66895dcdec8df1f496e017708c557fc252340c5",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=5.3.0"
+            },
+            "require-dev": {
+                "symfony/dotenv": "^4.3@dev"
+            },
+            "type": "package",
+            "autoload": {
+                "psr-4": {
+                    "Safaricom\\Mpesa\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "mit"
+            ],
+            "authors": [
+                {
+                    "name": "Moses Nandwa",
+                    "email": "mnandwa@safaricom.co.ke"
+                }
+            ],
+            "description": "A PHP package for Mpesa API",
+            "support": {
+                "issues": "https://github.com/safaricom/mpesa-php-sdk/issues",
+                "source": "https://github.com/safaricom/mpesa-php-sdk/tree/master"
+            },
+            "time": "2019-01-06T16:01:21+00:00"
         },
         {
             "name": "symfony/clock",

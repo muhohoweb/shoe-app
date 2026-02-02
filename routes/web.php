@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\MpesaController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ShopController;
@@ -38,5 +39,8 @@ Route::post('/shop/order', [ShopController::class, 'placeOrder'])->name('shop.or
 
 
 Route::resource('orders', OrderController::class)->only(['index', 'update', 'destroy']);
+
+Route::post('/mpesa/callback', [MpesaController::class, 'callback']);
+Route::get('/mpesa/status/{checkoutRequestId}', [MpesaController::class, 'checkStatus']);
 
 require __DIR__.'/settings.php';

@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
+use App\Models\MpesaTransaction;
 use App\Models\Order;
 use App\Models\Product;
+use Iankumu\Mpesa\Facades\Mpesa;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -19,7 +23,7 @@ class ShopController extends Controller
             ->latest()
             ->get();
 
-        $categories = \App\Models\Category::withCount([
+        $categories = Category::query()->withCount([
             'products' => fn($q) => $q->where('is_active', true)->where('status', 'active')->where('stock', '>', 0)
         ])->get();
 
@@ -44,13 +48,14 @@ class ShopController extends Controller
             'items.*.price' => 'required|numeric|min:0',
         ]);
 
-        // Calculate total from server-side product prices to prevent tampering
+        // Calculate total from server-side product prices
         $total = 0;
         foreach ($validated['items'] as $item) {
-            $product = Product::findOrFail($item['product_id']);
+            $product = Product::query()->findOrFail($item['product_id']);
             $total += $product->price * $item['quantity'];
         }
 
+        // Create order
         $order = Order::query()->create([
             'uuid' => (string) Str::uuid(),
             'customer_name' => $validated['customer_name'],
@@ -62,8 +67,9 @@ class ShopController extends Controller
             'payment_status' => 'pending',
         ]);
 
+        // Create order items
         foreach ($validated['items'] as $item) {
-            $product = Product::findOrFail($item['product_id']);
+            $product = Product::query()->findOrFail($item['product_id']);
             $order->items()->create([
                 'product_id' => $item['product_id'],
                 'size' => $item['size'],
@@ -72,13 +78,73 @@ class ShopController extends Controller
                 'quantity' => $item['quantity'],
             ]);
 
-            // Decrement stock
             $product->decrement('stock', $item['quantity']);
         }
+
+        // Initiate M-Pesa STK Push
+        $stkResult = $this->initiateStkPush($order, $validated['mpesa_number'], (int) $total);
 
         return back()->with('orderSuccess', [
             'uuid' => $order->uuid,
             'amount' => $total,
+            'stk_sent' => $stkResult['success'],
+            'stk_message' => $stkResult['message'],
+            'checkout_request_id' => $stkResult['checkout_request_id'] ?? null,
         ]);
+    }
+
+    private function initiateStkPush(Order $order, string $phoneNumber, int $amount): array
+    {
+        // Format phone: 07xxxxxxxx -> 2547xxxxxxxx
+        $phone = preg_replace('/^0/', '254', $phoneNumber);
+        $phone = preg_replace('/^\+/', '', $phone);
+
+        $accountReference = 'ORD-' . substr($order->uuid, 0, 8);
+
+        try {
+            $response = Mpesa::stkpush(
+                phonenumber: $phone,
+                amount: $amount,
+                account_number: $accountReference,
+                callbackurl: null,  // Uses config default
+                transactionType: 'CustomerPayBillOnline'
+            );
+
+            $result = $response->json();
+
+            Log::info('M-Pesa STK Push Response', $result);
+
+            if (isset($result['ResponseCode']) && $result['ResponseCode'] === '0') {
+                // Store transaction
+                MpesaTransaction::create([
+                    'order_id' => $order->id,
+                    'merchant_request_id' => $result['MerchantRequestID'],
+                    'checkout_request_id' => $result['CheckoutRequestID'],
+                    'phone_number' => $phone,
+                    'amount' => $amount,
+                    'account_reference' => $accountReference,
+                    'status' => 'pending',
+                ]);
+
+                return [
+                    'success' => true,
+                    'message' => 'Check your phone for M-Pesa prompt',
+                    'checkout_request_id' => $result['CheckoutRequestID'],
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => $result['ResponseDescription'] ?? 'Failed to send M-Pesa prompt',
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('M-Pesa STK Push Error: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => 'Payment service temporarily unavailable',
+            ];
+        }
     }
 }
