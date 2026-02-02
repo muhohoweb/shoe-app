@@ -147,4 +147,21 @@ class ShopController extends Controller
             ];
         }
     }
+
+
+    // In MpesaController
+    public function settings()
+    {
+        $stats = [
+            'total_transactions' => MpesaTransaction::count(),
+            'completed' => MpesaTransaction::where('status', 'completed')->count(),
+            'pending' => MpesaTransaction::where('status', 'pending')->count(),
+            'failed' => MpesaTransaction::where('status', 'failed')->count(),
+            'total_amount' => MpesaTransaction::where('status', 'completed')->sum('amount'),
+        ];
+
+        return Inertia::render('settings/Mpesa', [
+            'stats' => $stats,
+        ]);
+    }
 }

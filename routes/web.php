@@ -40,7 +40,19 @@ Route::post('/shop/order', [ShopController::class, 'placeOrder'])->name('shop.or
 
 Route::resource('orders', OrderController::class)->only(['index', 'update', 'destroy']);
 
+
+// M-Pesa Callbacks (no auth, no CSRF)
 Route::post('/mpesa/callback', [MpesaController::class, 'callback']);
+Route::post('/mpesa/balance/callback', [MpesaController::class, 'balanceCallback']);
 Route::get('/mpesa/status/{checkoutRequestId}', [MpesaController::class, 'checkStatus']);
+Route::get('/api/mpesa/balance', [MpesaController::class, 'getBalance']);
+
+
+// M-Pesa Settings & Balance
+Route::middleware(['auth'])->group(function () {
+    Route::get('/settings/mpesa', [MpesaController::class, 'settings'])->name('mpesa.settings');
+    Route::post('/settings/mpesa/balance', [MpesaController::class, 'queryBalance'])->name('mpesa.balance');
+});
+
 
 require __DIR__.'/settings.php';
