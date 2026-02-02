@@ -28,12 +28,14 @@ class MpesaController extends Controller
     {
         try {
 
-            $shortcode = env('MPESA_BUSINESS_SHORTCODE');
+            $shortcode = env('MPESA_BUSINESS_SHORTCODE','');
             $identiertype = 4;
             $remarks = "ONLINE CHECK BALANCE";
             $result_url = env('MPESA_BALANCE_TIMEOUT_URL');
             $timeout_url = env('MPESA_BALANCE_TIMEOUT_URL');
-            $shortCodeType = "";
+            $shortCodeType = "C2B";
+
+
 
             $response = Mpesa::accountbalance(
                 $shortcode,
