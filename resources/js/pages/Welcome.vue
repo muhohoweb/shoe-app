@@ -249,23 +249,14 @@ onMounted(() => {
     </nav>
 
     <!-- HERO -->
-    <section style="position: relative; overflow: hidden; background: var(--charcoal); height: 420px; display: flex; align-items: center;">
-      <div style="position: absolute; inset: 0; opacity: 0.12;" >
-        <svg width="100%" height="100%" style="position: absolute; inset: 0;">
-          <defs>
-            <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
-              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="white" stroke-width="0.5"/>
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid)" />
-        </svg>
-      </div>
+    <section style="position: relative; overflow: hidden; height: 420px; display: flex; align-items: center; background: url('/images/auth-bg.jpg') center/cover;">
+      <div style="position: absolute; inset: 0; background: rgba(26,26,26,0.6);"></div>
       <div style="position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 24px; width: 100%;">
         <p style="font-size: 0.7rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px;">New Collection 2026</p>
         <h2 class="font-display" style="font-size: clamp(2.2rem, 5vw, 3.6rem); font-weight: 700; color: white; line-height: 1.15; max-width: 560px;">
           Walk with<br><span style="color: var(--accent);">confidence.</span>
         </h2>
-        <p style="margin-top: 18px; color: rgba(255,255,255,0.5); font-size: 0.9rem; max-width: 420px; line-height: 1.6;">
+        <p style="margin-top: 18px; color: rgba(255,255,255,0.7); font-size: 0.9rem; max-width: 420px; line-height: 1.6;">
           Premium footwear crafted for those who value style, comfort and every step they take.
         </p>
         <button class="btn-primary" style="margin-top: 28px;" @click="document.getElementById('products-section')?.scrollIntoView({ behavior: 'smooth' })">
@@ -508,51 +499,25 @@ onMounted(() => {
           </div>
         </div>
 
-        <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
           <div>
             <label class="shop-label"><User :size="12" style="vertical-align: middle; margin-right: 4px;" />Full Name</label>
-            <input
-                v-model="orderForm.customer_name"
-                class="shop-input"
-                :class="{ error: orderForm.errors.customer_name }"
-                placeholder="e.g. John Doe"
-            />
+            <input v-model="orderForm.customer_name" class="shop-input" :class="{ error: orderForm.errors.customer_name }" placeholder="e.g. John Doe" />
             <span v-if="orderForm.errors.customer_name" style="font-size: 0.7rem; color: #d63031; margin-top: 4px;">{{ orderForm.errors.customer_name }}</span>
           </div>
-
           <div>
             <label class="shop-label"><Phone :size="12" style="vertical-align: middle; margin-right: 4px;" />M-Pesa Number</label>
-            <input
-                v-model="orderForm.mpesa_number"
-                class="shop-input"
-                :class="{ error: orderForm.errors.mpesa_number }"
-                placeholder="e.g. 0712345678"
-                type="tel"
-            />
+            <input v-model="orderForm.mpesa_number" class="shop-input" :class="{ error: orderForm.errors.mpesa_number }" placeholder="e.g. 0712345678" type="tel" />
             <span v-if="orderForm.errors.mpesa_number" style="font-size: 0.7rem; color: #d63031; margin-top: 4px;">{{ orderForm.errors.mpesa_number }}</span>
           </div>
-
-          <div>
+          <div style="grid-column: span 2;">
             <label class="shop-label"><MapPin :size="12" style="vertical-align: middle; margin-right: 4px;" />Town / City</label>
-            <input
-                v-model="orderForm.town"
-                class="shop-input"
-                :class="{ error: orderForm.errors.town }"
-                placeholder="e.g. Nairobi"
-            />
+            <input v-model="orderForm.town" class="shop-input" :class="{ error: orderForm.errors.town }" placeholder="e.g. Nairobi" />
             <span v-if="orderForm.errors.town" style="font-size: 0.7rem; color: #d63031; margin-top: 4px;">{{ orderForm.errors.town }}</span>
           </div>
-
-          <div>
+          <div style="grid-column: span 2;">
             <label class="shop-label"><Truck :size="12" style="vertical-align: middle; margin-right: 4px;" />Delivery / Pickup Details</label>
-            <textarea
-                v-model="orderForm.description"
-                class="shop-input"
-                :class="{ error: orderForm.errors.description }"
-                placeholder="Describe your delivery address or pickup point..."
-                rows="3"
-                style="resize: vertical;"
-            ></textarea>
+            <textarea v-model="orderForm.description" class="shop-input" :class="{ error: orderForm.errors.description }" placeholder="Describe your delivery address or pickup point..." rows="2" style="resize: vertical;"></textarea>
             <span v-if="orderForm.errors.description" style="font-size: 0.7rem; color: #d63031; margin-top: 4px;">{{ orderForm.errors.description }}</span>
           </div>
         </div>
