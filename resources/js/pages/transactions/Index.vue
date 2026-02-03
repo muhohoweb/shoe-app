@@ -1,37 +1,20 @@
 <script setup lang="ts">
-import { Head, router } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
-import transactions from '@/routes/transactions';
 import { type BreadcrumbItem } from '@/types';
-import { ref, watch } from 'vue';
 
-//comment
 const props = defineProps<{
-  transactions: {
-    data: Array<{
-      id: number;
-      phone_number: string;
-      amount: string;
-      account_reference: string;
-      mpesa_receipt_number: string | null;
-      status: 'pending' | 'completed' | 'failed';
-      created_at: string;
-    }>;
-  };
-  filters: {
-    status: string | null;
-  };
+  transactions: Array<{
+    id: number;
+    phone_number: string;
+    amount: string;
+    account_reference: string;
+    mpesa_receipt_number: string | null;
+    status: 'pending' | 'completed' | 'failed';
+    created_at: string;
+  }>;
 }>();
-
-const statusFilter = ref(props.filters.status ?? '');
-
-watch(statusFilter, (value) => {
-  router.get(transactions.index(), { status: value || undefined }, {
-    preserveState: true,
-    replace: true,
-  });
-});
 
 const rowClass = (status: string) => {
   return {
@@ -58,16 +41,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
   <AppLayout :breadcrumbs="breadcrumbs">
     <div class="p-6">
-      <div class="flex justify-between items-center mb-4">
-        <h1 class="text-2xl font-semibold">M-Pesa Transactions</h1>
-
-        <select v-model="statusFilter" class="border rounded px-3 py-2">
-          <option value="">All Statuses</option>
-          <option value="completed">Completed</option>
-          <option value="pending">Pending</option>
-          <option value="failed">Failed</option>
-        </select>
-      </div>
+      <h1 class="text-2xl font-semibold mb-4">M-Pesa Transactions</h1>
 
       <table class="w-full border-collapse border">
         <thead>
@@ -81,7 +55,7 @@ const breadcrumbs: BreadcrumbItem[] = [
         </tr>
         </thead>
         <tbody>
-        <tr v-for="tx in transactions.data" :key="tx.id" :class="rowClass(tx.status)">
+        <tr v-for="tx in transactions" :key="tx.id" :class="rowClass(tx.status)">
           <td class="border p-2">{{ tx.phone_number }}</td>
           <td class="border p-2">{{ tx.amount }}</td>
           <td class="border p-2">{{ tx.account_reference }}</td>
