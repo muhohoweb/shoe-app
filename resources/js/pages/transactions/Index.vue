@@ -12,6 +12,7 @@ const props = defineProps<{
     account_reference: string;
     mpesa_receipt_number: string | null;
     status: 'pending' | 'completed' | 'failed';
+    result_desc:string | null
     created_at: string;
   }>;
 }>();
@@ -51,6 +52,7 @@ const breadcrumbs: BreadcrumbItem[] = [
           <th class="border p-2 text-left">Reference</th>
           <th class="border p-2 text-left">Receipt</th>
           <th class="border p-2 text-left">Status</th>
+          <th class="border p-2 text-left">Result Desc</th>
           <th class="border p-2 text-left">Date</th>
         </tr>
         </thead>
@@ -61,6 +63,7 @@ const breadcrumbs: BreadcrumbItem[] = [
           <td class="border p-2">{{ tx.account_reference }}</td>
           <td class="border p-2">{{ tx.mpesa_receipt_number ?? '-' }}</td>
           <td class="border p-2">{{ tx.status }}</td>
+          <td class="border p-2">{{ tx.result_desc }}</td>
           <td class="border p-2">{{ tx.created_at }}</td>
         </tr>
         </tbody>
