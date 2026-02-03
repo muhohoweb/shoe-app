@@ -4,6 +4,7 @@ use App\Http\Controllers\MpesaController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ShopController;
+use App\Http\Controllers\WhatsAppController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -53,6 +54,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/settings/mpesa', [MpesaController::class, 'settings'])->name('mpesa.settings');
     Route::post('/settings/mpesa/balance', [MpesaController::class, 'queryBalance'])->name('mpesa.balance');
 });
+
+//WhatsApp callbacks
+Route::post('/whatsapp/webhook', [WhatsAppController::class, 'webhook']);
 
 
 require __DIR__.'/settings.php';
