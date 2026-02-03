@@ -501,17 +501,17 @@ onMounted(() => {
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
           <div>
-            <label class="shop-label"><User :size="12" style="vertical-align: middle; margin-right: 4px;" />Full Name</label>
+            <label class="shop-label"><User :size="12" style="vertical-align: middle; margin-right: 4px;" />Name</label>
             <input v-model="orderForm.customer_name" class="shop-input" :class="{ error: orderForm.errors.customer_name }" placeholder="e.g. John Doe" />
             <span v-if="orderForm.errors.customer_name" style="font-size: 0.7rem; color: #d63031; margin-top: 4px;">{{ orderForm.errors.customer_name }}</span>
           </div>
           <div>
-            <label class="shop-label"><Phone :size="12" style="vertical-align: middle; margin-right: 4px;" />M-Pesa Number</label>
+            <label class="shop-label"><Phone :size="12" style="vertical-align: middle; margin-right: 4px;" />M-Pesa No</label>
             <input v-model="orderForm.mpesa_number" class="shop-input" :class="{ error: orderForm.errors.mpesa_number }" placeholder="e.g. 0712345678" type="tel" />
             <span v-if="orderForm.errors.mpesa_number" style="font-size: 0.7rem; color: #d63031; margin-top: 4px;">{{ orderForm.errors.mpesa_number }}</span>
           </div>
           <div style="grid-column: span 2;">
-            <label class="shop-label"><MapPin :size="12" style="vertical-align: middle; margin-right: 4px;" />Town / City</label>
+            <label class="shop-label"><MapPin :size="12" style="vertical-align: middle; margin-right: 4px;" />Town</label>
             <input v-model="orderForm.town" class="shop-input" :class="{ error: orderForm.errors.town }" placeholder="e.g. Nairobi" />
             <span v-if="orderForm.errors.town" style="font-size: 0.7rem; color: #d63031; margin-top: 4px;">{{ orderForm.errors.town }}</span>
           </div>
