@@ -50,6 +50,7 @@ const mainNavItems: NavItem[] = [
   },
 ];
 
+
 const footerNavItems: NavItem[] = [
 
 ];
