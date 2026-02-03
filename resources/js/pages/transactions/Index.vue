@@ -12,10 +12,20 @@ const props = defineProps<{
     account_reference: string;
     mpesa_receipt_number: string | null;
     status: 'pending' | 'completed' | 'failed';
-    result_desc:string | null
+    result_desc: string | null;
     created_at: string;
   }>;
 }>();
+
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-KE', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
 
 const rowClass = (status: string) => {
   return {
@@ -63,8 +73,8 @@ const breadcrumbs: BreadcrumbItem[] = [
           <td class="border p-2">{{ tx.account_reference }}</td>
           <td class="border p-2">{{ tx.mpesa_receipt_number ?? '-' }}</td>
           <td class="border p-2">{{ tx.status }}</td>
-          <td class="border p-2">{{ tx.result_desc }}</td>
-          <td class="border p-2">{{ tx.created_at }}</td>
+          <td class="border p-2">{{ tx.result_desc ?? '-' }}</td>
+          <td class="border p-2">{{ formatDate(tx.created_at) }}</td>
         </tr>
         </tbody>
       </table>
