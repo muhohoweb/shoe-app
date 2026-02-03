@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AuthBase from '@/layouts/AuthLayout.vue';
-import { register } from '@/routes';
+
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 
@@ -20,6 +20,9 @@ defineProps<{
 </script>
 
 <template>
+  <div class="min-h-screen bg-cover bg-center relative" style="background-image: url('/images/auth-bg.jpg')">
+    <div class="absolute inset-0 bg-black/50" />
+    <div class="relative z-10">
     <AuthBase
         title="Log in to your account"
         description="Enter your email and password below to log in"
@@ -107,4 +110,6 @@ defineProps<{
             </div>
         </Form>
     </AuthBase>
+    </div>
+    </div>
 </template>
