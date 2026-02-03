@@ -11,7 +11,9 @@ class TransactionController extends Controller
     public function index(): Response
     {
         return Inertia::render('transactions/Index', [
-            'transactions' => MpesaTransaction::latest()->get(),
+            'transactions' => MpesaTransaction::orderByRaw("FIELD(status, 'completed', 'pending', 'failed')")
+                ->latest()
+                ->get(),
         ]);
     }
 }
