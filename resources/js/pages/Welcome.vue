@@ -396,82 +396,87 @@ const getProductImage = (product: any) => {
   <!-- PRODUCT DETAIL MODAL                                                    -->
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <div v-if="selectedProduct" class="modal-overlay" @click.self="closeProductDetail">
-    <div class="modal-content" style="background: white; border-radius: 12px; max-width: 700px; width: 90vw; max-height: 88vh; overflow-y: auto; position: relative;">
-      <button @click="closeProductDetail" style="position: absolute; top: 16px; right: 16px; z-index: 2; background: rgba(255,255,255,0.9); border: none; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-        <X :size="18" style="color: var(--charcoal);" />
+    <div class="product-modal">
+      <!-- Close Button -->
+      <button @click="closeProductDetail" class="modal-close-btn">
+        <X :size="18" />
       </button>
 
-      <div style="aspect-ratio: 4/3; max-height: 280px; background: var(--cream-dark); overflow: hidden;">
+      <!-- Image Section - Top Half -->
+      <div class="product-modal-image">
         <img
             v-if="getProductImage(selectedProduct)"
             :src="getProductImage(selectedProduct)"
             :alt="selectedProduct.name"
-            style="width: 100%; height: 100%; object-fit: cover;"
         />
-        <div v-else style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+        <div v-else class="product-modal-placeholder">
           <ShoppingCart :size="48" style="color: #c5bfb5;" />
         </div>
+        <!-- Category Badge -->
+        <span class="product-modal-badge">{{ selectedProduct.category?.name }}</span>
       </div>
 
-      <div style="padding: 28px;">
-        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
-          <div>
-            <span style="font-size: 0.68rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent);">{{ selectedProduct.category?.name }}</span>
-            <h2 class="font-display" style="font-size: 1.6rem; font-weight: 700; margin: 4px 0 0; color: var(--charcoal);">{{ selectedProduct.name }}</h2>
-          </div>
-          <span style="font-size: 1.4rem; font-weight: 700; color: var(--charcoal); white-space: nowrap;">{{ formatPrice(selectedProduct.price) }}</span>
+      <!-- Details Section - Bottom Half -->
+      <div class="product-modal-details">
+        <!-- Header: Name & Price -->
+        <div class="product-modal-header">
+          <h2 class="font-display">{{ selectedProduct.name }}</h2>
+          <span class="product-modal-price">{{ formatPrice(selectedProduct.price) }}</span>
         </div>
 
-        <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.7; margin: 16px 0 24px;">{{ selectedProduct.description }}</p>
+        <!-- Description (truncated) -->
+        <p class="product-modal-desc">{{ selectedProduct.description }}</p>
 
-        <div v-if="selectedProduct.colors && selectedProduct.colors.length" style="margin-bottom: 20px;">
-          <label class="shop-label">Color</label>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button
-                v-for="color in selectedProduct.colors"
-                :key="color"
-                class="option-btn"
-                :class="{ selected: selectedColor === color }"
-                @click="selectedColor = color"
-            >{{ color }}</button>
+        <!-- Options Row: Color & Size side by side -->
+        <div class="product-modal-options">
+          <div v-if="selectedProduct.colors && selectedProduct.colors.length" class="option-group">
+            <label class="shop-label">Color</label>
+            <div class="option-pills">
+              <button
+                  v-for="color in selectedProduct.colors"
+                  :key="color"
+                  class="pill-btn"
+                  :class="{ selected: selectedColor === color }"
+                  @click="selectedColor = color"
+              >{{ color }}</button>
+            </div>
+          </div>
+
+          <div v-if="selectedProduct.sizes && selectedProduct.sizes.length" class="option-group">
+            <label class="shop-label">Size</label>
+            <div class="option-pills">
+              <button
+                  v-for="size in selectedProduct.sizes"
+                  :key="size"
+                  class="pill-btn"
+                  :class="{ selected: selectedSize === size }"
+                  @click="selectedSize = size"
+              >{{ size }}</button>
+            </div>
           </div>
         </div>
 
-        <div v-if="selectedProduct.sizes && selectedProduct.sizes.length" style="margin-bottom: 20px;">
-          <label class="shop-label">Size</label>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button
-                v-for="size in selectedProduct.sizes"
-                :key="size"
-                class="option-btn"
-                :class="{ selected: selectedSize === size }"
-                @click="selectedSize = size"
-            >{{ size }}</button>
-          </div>
-        </div>
-
-        <div style="margin-bottom: 28px;">
-          <label class="shop-label">Quantity</label>
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <button class="qty-btn" @click="detailQuantity = Math.max(1, detailQuantity - 1)">
-              <Minus :size="14" style="color: var(--charcoal);" />
+        <!-- Footer: Quantity & Add to Cart -->
+        <div class="product-modal-footer">
+          <div class="qty-selector">
+            <button class="qty-btn-sm" @click="detailQuantity = Math.max(1, detailQuantity - 1)">
+              <Minus :size="14" />
             </button>
-            <span style="font-size: 0.95rem; font-weight: 600; min-width: 20px; text-align: center;">{{ detailQuantity }}</span>
-            <button class="qty-btn" @click="detailQuantity = Math.min(selectedProduct.stock, detailQuantity + 1)">
-              <Plus :size="14" style="color: var(--charcoal);" />
+            <span class="qty-value">{{ detailQuantity }}</span>
+            <button class="qty-btn-sm" @click="detailQuantity = Math.min(selectedProduct.stock, detailQuantity + 1)">
+              <Plus :size="14" />
             </button>
-            <span style="font-size: 0.72rem; color: var(--text-muted); margin-left: 8px;">{{ selectedProduct.stock }} in stock</span>
+            <span class="stock-info">{{ selectedProduct.stock }} in stock</span>
           </div>
-        </div>
 
-        <button
-            class="btn-primary"
-            style="width: 100%; justify-content: center;"
-            :disabled="!selectedSize || !selectedColor"
-            @click="addToCart"
-        >
-          Add to Cart — {{ formatPrice(selectedProduct.price * detailQuantity) }}
-        </button>
+          <button
+              class="btn-add-cart"
+              :disabled="!selectedSize || !selectedColor"
+              @click="addToCart"
+          >
+            Add to Cart <span class="cart-price">{{ formatPrice(selectedProduct.price * detailQuantity) }}</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -929,5 +934,258 @@ body {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* PRODUCT DETAIL MODAL STYLES                                                 */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.product-modal {
+  background: white;
+  border-radius: 16px;
+  width: 420px;
+  max-width: 92vw;
+  max-height: 90vh;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.28s cubic-bezier(.22,1,.36,1);
+  box-shadow: 0 25px 60px rgba(0,0,0,0.25);
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(8px);
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  transition: transform 0.2s, box-shadow 0.2s;
+  color: var(--charcoal);
+}
+.modal-close-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+
+.product-modal-image {
+  position: relative;
+  width: 100%;
+  height: 280px;
+  background: linear-gradient(135deg, #f0ebe5 0%, #e5dfd6 100%);
+  overflow: hidden;
+}
+.product-modal-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.product-modal-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.product-modal-badge {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(8px);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-dark);
+}
+
+.product-modal-details {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.product-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.product-modal-header h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--charcoal);
+  margin: 0;
+  line-height: 1.2;
+}
+.product-modal-price {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--charcoal);
+  white-space: nowrap;
+  background: var(--cream);
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.product-modal-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.product-modal-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.option-group .shop-label {
+  margin: 0;
+  font-size: 0.68rem;
+}
+.option-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.pill-btn {
+  padding: 6px 12px;
+  border: 1.5px solid #e0d9d0;
+  border-radius: 20px;
+  background: white;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--charcoal-soft);
+}
+.pill-btn:hover {
+  border-color: var(--accent);
+  background: #faf8f5;
+}
+.pill-btn.selected {
+  background: var(--charcoal);
+  color: white;
+  border-color: var(--charcoal);
+}
+
+.product-modal-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #f0ebe5;
+}
+
+.qty-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.qty-btn-sm {
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid #e0d9d0;
+  background: white;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--charcoal);
+}
+.qty-btn-sm:hover {
+  border-color: var(--charcoal);
+  background: var(--cream);
+}
+.qty-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  min-width: 24px;
+  text-align: center;
+}
+.stock-info {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.btn-add-cart {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--charcoal);
+  color: white;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-add-cart:hover {
+  background: var(--charcoal-soft);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.btn-add-cart:active {
+  transform: translateY(0);
+}
+.btn-add-cart:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+.btn-add-cart .cart-price {
+  background: rgba(255,255,255,0.15);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 700;
+}
+
+@media (max-width: 480px) {
+  .product-modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  .product-modal-image {
+    height: 240px;
+  }
+  .product-modal-options {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
 }
 </style>
