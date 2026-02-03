@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm, usePage } from '@inertiajs/vue3'
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { ShoppingCart, X, Plus, Minus, ArrowRight, Phone, MapPin, User, Truck, Loader2 } from 'lucide-vue-next'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
@@ -205,6 +205,37 @@ const closeSuccessModal = () => {
   mpesaReceipt.value = null
 }
 
+// ─── Parallax Effect ────────────────────────────────────────────────────────
+const scrollY = ref(0)
+
+const handleScroll = () => {
+  scrollY.value = window.scrollY
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll, { passive: true })
+  if (orderSuccess.value) {
+    isSuccessOpen.value = true
+  }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
+
+const parallaxBgStyle = computed(() => ({
+  transform: `translateY(${scrollY.value * 0.5}px) scale(${1 + scrollY.value * 0.0005})`,
+}))
+
+const heroContentStyle = computed(() => ({
+  transform: `translateY(${scrollY.value * -0.2}px)`,
+  opacity: Math.max(0, 1 - scrollY.value / 600),
+}))
+
+const heroOverlayStyle = computed(() => ({
+  opacity: Math.min(0.8, 0.6 + scrollY.value / 1000),
+}))
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const formatPrice = (price: number) => `KES ${Number(price).toLocaleString()}`
 
@@ -218,13 +249,6 @@ const getProductImage = (product: any) => {
   }
   return null
 }
-
-// show success modal if flash present
-onMounted(() => {
-  if (orderSuccess.value) {
-    isSuccessOpen.value = true
-  }
-})
 </script>
 
 <template>
@@ -234,7 +258,7 @@ onMounted(() => {
   <div style="min-height: 100vh; background: var(--cream);">
 
     <!-- NAV -->
-    <nav style="position: sticky; top: 0; z-index: 40; background: rgba(245,240,235,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid #e0d9d0;">
+    <nav style="position: fixed; top: 0; left: 0; right: 0; z-index: 40; background: rgba(245,240,235,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid #e0d9d0;">
       <div style="max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between;">
         <h1 class="font-display" style="font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; color: var(--charcoal);">
           <span style="color: var(--accent);">D</span>rmorch
@@ -248,26 +272,61 @@ onMounted(() => {
       </div>
     </nav>
 
-    <!-- HERO -->
-    <section style="position: relative; overflow: hidden; height: 420px; display: flex; align-items: center; background: url('/images/auth-bg.jpg') center/cover;">
-      <div style="position: absolute; inset: 0; background: rgba(26,26,26,0.6);"></div>
-      <div style="position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 24px; width: 100%;">
-        <p style="font-size: 0.7rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px;">New Collection 2026</p>
-        <h2 class="font-display" style="font-size: clamp(2.2rem, 5vw, 3.6rem); font-weight: 700; color: white; line-height: 1.15; max-width: 560px;">
-          Walk with<br><span style="color: var(--accent);">confidence.</span>
-        </h2>
-        <p style="margin-top: 18px; color: rgba(255,255,255,0.7); font-size: 0.9rem; max-width: 420px; line-height: 1.6;">
-          Premium footwear crafted for those who value style, comfort and every step they take.
-        </p>
-        <button class="btn-primary" style="margin-top: 28px;" @click="document.getElementById('products-section')?.scrollIntoView({ behavior: 'smooth' })">
-          Shop Now <ArrowRight :size="16" />
-        </button>
+    <!-- HERO WITH PARALLAX -->
+    <section class="hero-parallax" style="position: relative; overflow: hidden; height: 500px; margin-top: 64px;">
+      <!-- Parallax Background -->
+      <div
+          class="hero-bg"
+          :style="parallaxBgStyle"
+          style="position: absolute; inset: -50px; background: url('/images/auth-bg.jpg') center/cover no-repeat; will-change: transform;"
+      ></div>
+
+      <!-- Dynamic Overlay -->
+      <div
+          :style="heroOverlayStyle"
+          style="position: absolute; inset: 0; background: linear-gradient(135deg, rgba(26,26,26,0.7) 0%, rgba(26,26,26,0.4) 100%); will-change: opacity;"
+      ></div>
+
+      <!-- Floating Decorative Elements -->
+      <div
+          class="floating-shape shape-1"
+          :style="{ transform: `translate(${scrollY * 0.1}px, ${scrollY * -0.15}px)` }"
+      ></div>
+      <div
+          class="floating-shape shape-2"
+          :style="{ transform: `translate(${scrollY * -0.08}px, ${scrollY * 0.1}px)` }"
+      ></div>
+
+      <!-- Hero Content -->
+      <div
+          :style="heroContentStyle"
+          style="position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 24px; width: 100%; height: 100%; display: flex; align-items: center; will-change: transform, opacity;"
+      >
+        <div>
+          <p style="font-size: 0.7rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px;">New Collection 2026</p>
+          <h2 class="font-display" style="font-size: clamp(2.4rem, 5vw, 4rem); font-weight: 700; color: white; line-height: 1.1; max-width: 560px;">
+            Walk with<br><span style="color: var(--accent);">confidence.</span>
+          </h2>
+          <p style="margin-top: 20px; color: rgba(255,255,255,0.75); font-size: 0.95rem; max-width: 420px; line-height: 1.7;">
+            Premium footwear crafted for those who value style, comfort and every step they take.
+          </p>
+          <button class="btn-primary" style="margin-top: 32px;" @click="document.getElementById('products-section')?.scrollIntoView({ behavior: 'smooth' })">
+            Shop Now <ArrowRight :size="16" />
+          </button>
+        </div>
       </div>
-      <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--accent), transparent 60%);"></div>
+
+      <!-- Bottom Accent Line -->
+      <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--accent), transparent 70%); z-index: 2;"></div>
+
+      <!-- Scroll Indicator -->
+      <div class="scroll-indicator" :style="{ opacity: Math.max(0, 1 - scrollY / 150) }">
+        <div class="scroll-arrow"></div>
+      </div>
     </section>
 
     <!-- CATEGORY FILTER -->
-    <section style="max-width: 1200px; margin: 0 auto; padding: 32px 24px 0;">
+    <section style="max-width: 1200px; margin: 0 auto; padding: 40px 24px 0;">
       <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
         <span
             class="tag-pill"
@@ -297,16 +356,14 @@ onMounted(() => {
             v-for="product in filteredProducts"
             :key="product.id"
             @click="openProductDetail(product)"
-            style="background: white; border-radius: 10px; overflow: hidden; cursor: pointer; border: 1px solid #ede8e2; transition: transform 0.2s, box-shadow 0.2s;"
-            onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 30px rgba(0,0,0,0.08)'"
-            onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='none'"
+            class="product-card"
         >
           <div style="aspect-ratio: 4/3; background: var(--cream-dark); position: relative; overflow: hidden;">
             <img
                 v-if="getProductImage(product)"
                 :src="getProductImage(product)"
                 :alt="product.name"
-                style="width: 100%; height: 100%; object-fit: cover;"
+                class="product-img"
             />
             <div v-else style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
               <ShoppingCart :size="32" style="color: #c5bfb5;" />
@@ -655,6 +712,88 @@ body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--accent-light); border-radius: 3px; }
+
+/* Parallax Hero Styles */
+.hero-parallax {
+  perspective: 1px;
+  transform-style: preserve-3d;
+}
+
+.floating-shape {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.08;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.floating-shape.shape-1 {
+  width: 300px;
+  height: 300px;
+  background: var(--accent);
+  top: -50px;
+  right: 10%;
+  filter: blur(60px);
+}
+
+.floating-shape.shape-2 {
+  width: 200px;
+  height: 200px;
+  background: white;
+  bottom: 20%;
+  left: 5%;
+  filter: blur(40px);
+}
+
+.scroll-indicator {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  transition: opacity 0.3s;
+}
+
+.scroll-arrow {
+  width: 24px;
+  height: 24px;
+  border-right: 2px solid rgba(255,255,255,0.5);
+  border-bottom: 2px solid rgba(255,255,255,0.5);
+  transform: rotate(45deg);
+  animation: scrollBounce 2s infinite;
+}
+
+@keyframes scrollBounce {
+  0%, 20%, 50%, 80%, 100% { transform: rotate(45deg) translateY(0); }
+  40% { transform: rotate(45deg) translateY(8px); }
+  60% { transform: rotate(45deg) translateY(4px); }
+}
+
+/* Product Card Hover Effects */
+.product-card {
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid #ede8e2;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s;
+}
+
+.product-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+}
+
+.product-card .product-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.product-card:hover .product-img {
+  transform: scale(1.05);
+}
 
 .modal-overlay {
   position: fixed; inset: 0; z-index: 50;
