@@ -10,7 +10,7 @@ class TransactionController extends Controller
 {
     public function index(): Response
     {
-        $transactions = MpesaTransaction::latest()->paginate(15);
+        $transactions = MpesaTransaction::query()->latest()->paginate(15);
 
         return Inertia::render('transactions/Index', [
             'transactions' => $transactions,
