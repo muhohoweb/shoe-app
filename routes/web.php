@@ -8,7 +8,6 @@ use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\WhatsAppController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use Laravel\Fortify\Features;
 use App\Http\Controllers\CategoryController;
 
 Route::get('/', [ShopController::class, 'index'])->name('home');
