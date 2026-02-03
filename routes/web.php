@@ -4,6 +4,7 @@ use App\Http\Controllers\MpesaController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ShopController;
+use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\WhatsAppController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -57,6 +58,6 @@ Route::middleware(['auth'])->group(function () {
 
 //WhatsApp callbacks
 Route::match(['get', 'post'], '/whatsapp/webhook', [WhatsAppController::class, 'webhook']);
-
+Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
 
 require __DIR__.'/settings.php';

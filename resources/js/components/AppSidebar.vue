@@ -19,7 +19,8 @@ import categories from "@/routes/categories";
 import products from "@/routes/products";
 import orders from "@/routes/orders";
 
-import { LayoutGrid, FolderTree, Package, ShoppingCart, Folder, BookOpen } from 'lucide-vue-next';
+import {LayoutGrid, FolderTree, Package, ShoppingCart, Folder, BookOpen, Banknote} from 'lucide-vue-next';
+import transactions from "@/routes/transactions";
 
 const mainNavItems: NavItem[] = [
   {
@@ -41,6 +42,11 @@ const mainNavItems: NavItem[] = [
     title: 'Orders',
     href: orders.index(),
     icon: ShoppingCart,
+  },
+  {
+    title: 'Transactions',
+    href: transactions.index(),
+    icon: Banknote,
   },
 ];
 
