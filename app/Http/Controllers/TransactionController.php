@@ -16,7 +16,7 @@ class TransactionController extends Controller
             ->latest()
             ->paginate(15);
 
-        return Inertia::render('Transactions/Index', [
+        return Inertia::render('transactions/Index', [
             'transactions' => $transactions,
             'filters' => [
                 'status' => $request->status,
