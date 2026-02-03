@@ -56,7 +56,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 //WhatsApp callbacks
-Route::post('/whatsapp/webhook', [WhatsAppController::class, 'webhook']);
+Route::match(['get', 'post'], '/whatsapp/webhook', [WhatsAppController::class, 'webhook']);
 
 
 require __DIR__.'/settings.php';
