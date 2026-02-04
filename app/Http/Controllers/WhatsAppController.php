@@ -39,12 +39,12 @@ class WhatsAppController extends Controller
         return response('OK', 200);
     }
 
-    public function sendDispatchNotification(string $to, string $name, string $orderId, string $destination, string $deliveryDate)
+    public function sendDispatchNotification(Request $request)
     {
         $response = Http::withToken(env('WHATSAPP_ACCESS_TOKEN'))
             ->post('https://graph.facebook.com/v21.0/' . env('WHATSAPP_PHONE_NUMBER_ID') . '/messages', [
                 'messaging_product' => 'whatsapp',
-                'to' => $to,
+                'to' => $request->to,
                 'type' => 'template',
                 'template' => [
                     'name' => 'dispatch',
@@ -53,10 +53,10 @@ class WhatsAppController extends Controller
                         [
                             'type' => 'body',
                             'parameters' => [
-                                ['type' => 'text', 'text' => $name],
-                                ['type' => 'text', 'text' => $orderId],
-                                ['type' => 'text', 'text' => $destination],
-                                ['type' => 'text', 'text' => $deliveryDate],
+                                ['type' => 'text', 'text' => $request->name],
+                                ['type' => 'text', 'text' => $request->order_id],
+                                ['type' => 'text', 'text' => $request->destination],
+                                ['type' => 'text', 'text' => $request->delivery_date],
                             ]
                         ]
                     ]
