@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\Product;
 use Iankumu\Mpesa\Facades\Mpesa;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -164,4 +165,6 @@ class ShopController extends Controller
             'stats' => $stats,
         ]);
     }
+
+
 }

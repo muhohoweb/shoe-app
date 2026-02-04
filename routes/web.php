@@ -60,5 +60,6 @@ Route::middleware(['auth'])->group(function () {
 //WhatsApp callbacks
 Route::match(['get', 'post'], '/whatsapp/webhook', [WhatsAppController::class, 'webhook']);
 Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
+Route::post('/whatsapp/send-dispatch', [WhatsAppController::class, 'sendDispatchNotification']);
 
 require __DIR__.'/settings.php';
