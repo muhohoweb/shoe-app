@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'mpesa/balance/callback',
             'whatsapp/webhook',
             'whatsapp/webhook/',
+            'whatsapp/send-dispatch/',
         ]);
 
         $middleware->web(append: [
