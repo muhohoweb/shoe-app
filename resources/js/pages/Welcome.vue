@@ -388,7 +388,8 @@ const getProductImage = (product: any) => {
     <!-- FOOTER -->
     <footer style="background: var(--charcoal); color: rgba(255,255,255,0.5); padding: 40px 24px; text-align: center;">
       <p class="font-display" style="font-size: 1.1rem; color: white; margin: 0 0 8px;"><span style="color: var(--accent);">D</span>rmorch</p>
-      <p style="font-size: 0.78rem; margin: 0;">© 2026 Drmorch. All rights reserved.</p>
+      <p style="font-size: 0.85rem; color: rgba(255,255,255,0.7); margin: 0 0 12px;">DR Morch Crafts</p>
+      <p style="font-size: 0.78rem; margin: 0;">© 2026 DR Morch Crafts. All rights reserved.</p>
     </footer>
   </div>
 
