@@ -20,9 +20,13 @@ const chartData = computed(() => {
   return {
     labels: ['Completed', 'Pending', 'Failed'],
     datasets: [{
+      label: 'Transactions',
       data: [completed, pending, failed],
       backgroundColor: ['#22c55e', '#f97316', '#ef4444'],
-      hoverOffset: 8,
+      hoverBackgroundColor: ['#16a34a', '#ea580c', '#dc2626'],
+      borderWidth: 2,
+      borderColor: '#fff',
+      hoverOffset: 12,
     }]
   };
 });
@@ -30,24 +34,43 @@ const chartData = computed(() => {
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
+  animation: {
+    animateRotate: true,
+    animateScale: true,
+    duration: 800,
+    easing: 'easeOutQuart' as const,
+  },
+  interaction: {
+    mode: 'nearest' as const,
+  },
   plugins: {
     legend: {
-      position: 'bottom' as const,
+      position: 'top' as const,
       labels: {
-        boxWidth: 12,
-        padding: 8,
-        font: { size: 11 },
+        padding: 16,
+        usePointStyle: true,
+        pointStyle: 'circle',
+        font: { size: 12 },
       },
     },
     title: {
-      display: false,
+      display: true,
+      text: 'Transaction Status',
+      font: { size: 14, weight: 'bold' as const },
+      padding: { bottom: 16 },
     },
     tooltip: {
+      enabled: true,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      titleFont: { size: 13 },
+      bodyFont: { size: 12 },
+      padding: 12,
+      cornerRadius: 8,
       callbacks: {
         label: (context: any) => {
           const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
           const percentage = ((context.raw / total) * 100).toFixed(1);
-          return `${context.label}: ${context.raw} (${percentage}%)`;
+          return ` ${context.label}: ${context.raw} (${percentage}%)`;
         }
       }
     }
