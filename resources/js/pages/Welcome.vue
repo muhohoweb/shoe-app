@@ -387,9 +387,20 @@ const getProductImage = (product: any) => {
 
     <!-- FOOTER -->
     <footer style="background: var(--charcoal); color: rgba(255,255,255,0.5); padding: 40px 24px; text-align: center;">
-      <p class="font-display" style="font-size: 1.1rem; color: white; margin: 0 0 8px;"><span style="color: var(--accent);">D</span>rmorch</p>
-      <p style="font-size: 0.85rem; color: rgba(255,255,255,0.7); margin: 0 0 12px;">DR Morch Crafts</p>
-      <p style="font-size: 0.78rem; margin: 0;">© 2026 DR Morch Crafts. All rights reserved.</p>
+      <p class="font-display" style="font-size: 1.1rem; color: white; margin: 0 0 8px;">
+        <span style="color: var(--accent);">D</span>rmorch
+      </p>
+      <p style="font-size: 0.85rem; color: rgba(255,255,255,0.7); margin: 0 0 12px; font-weight: 500;">
+        DR.MORCH CRAFTS
+      </p>
+      <p style="font-size: 0.72rem; color: rgba(255,255,255,0.5); margin: 0 0 8px; max-width: 400px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+        Ground Room, 3 Ampel House, Ground Floor, DR.Morch Workshop,<br>
+        Lurambi-Sichirai Street off Kakamega Webuye Road, Kakamega
+      </p>
+      <p style="font-size: 0.7rem; color: rgba(255,255,255,0.4); margin: 0 0 4px;">
+        Business Reg: BN-RRS3LV6P
+      </p>
+      <p style="font-size: 0.72rem; margin: 0;">© 2026 DR.Morch Crafts. All rights reserved.</p>
     </footer>
   </div>
 
