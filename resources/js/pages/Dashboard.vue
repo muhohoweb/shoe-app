@@ -49,7 +49,7 @@ const breadcrumbs: BreadcrumbItem[] = [
         </div>
       </div>
       <div class="flex-1 rounded-xl border border-sidebar-border/70 bg-white p-4 shadow-sm dark:border-sidebar-border dark:bg-gray-900">
-        <PlaceholderPattern />
+<!--        <PlaceholderPattern />-->
       </div>
     </div>
   </AppLayout>
