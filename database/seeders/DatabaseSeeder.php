@@ -21,9 +21,9 @@ class DatabaseSeeder extends Seeder
             'password'=>bcrypt('363WAIs7ce6M')
         ]);
 
-        $this->call([
-            CategorySeeder::class,
-            ProductSeeder::class
-        ]);
+//        $this->call([
+//            CategorySeeder::class,
+//            ProductSeeder::class
+//        ]);
     }
 }
