@@ -18,7 +18,7 @@ class DatabaseSeeder extends Seeder
         User::query()->create([
             'name' => 'Test User',
             'email' => 'app@gmail.com',
-            'password'=>bcrypt('5xM0I73Em5gN')
+            'password'=>bcrypt('363WAIs7ce6M')
         ]);
 
         $this->call([
