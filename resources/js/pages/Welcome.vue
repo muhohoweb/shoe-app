@@ -386,6 +386,7 @@ const getProductImage = (product: any) => {
     </section>
 
     <!-- FOOTER -->
+    <!-- FOOTER -->
     <footer style="background: var(--charcoal); color: rgba(255,255,255,0.5); padding: 40px 24px; text-align: center;">
       <p class="font-display" style="font-size: 1.1rem; color: white; margin: 0 0 8px;">
         <span style="color: var(--accent);">D</span>rmorch
@@ -396,6 +397,9 @@ const getProductImage = (product: any) => {
       <p style="font-size: 0.72rem; color: rgba(255,255,255,0.5); margin: 0 0 8px; max-width: 400px; margin-left: auto; margin-right: auto; line-height: 1.5;">
         Ground Room, 3 Ampel House, Ground Floor, DR.Morch Workshop,<br>
         Lurambi-Sichirai Street off Kakamega Webuye Road, Kakamega
+      </p>
+      <p style="font-size: 0.72rem; color: rgba(255,255,255,0.6); margin: 0 0 8px;">
+        Tel: 0700 801 438
       </p>
       <p style="font-size: 0.7rem; color: rgba(255,255,255,0.4); margin: 0 0 4px;">
         Business Reg: BN-RRS3LV6P
