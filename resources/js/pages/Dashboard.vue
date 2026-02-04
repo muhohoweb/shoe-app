@@ -31,15 +31,21 @@ const breadcrumbs: BreadcrumbItem[] = [
       <div class="grid gap-6 md:grid-cols-3">
         <div class="rounded-xl border border-sidebar-border/70 bg-white p-4 shadow-sm dark:border-sidebar-border dark:bg-gray-900">
           <h3 class="mb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Revenue</h3>
-          <TransactionsGraph :data="transactions" />
+          <div class="h-48">
+            <TransactionsGraph :data="transactions" />
+          </div>
         </div>
         <div class="rounded-xl border border-sidebar-border/70 bg-white p-4 shadow-sm dark:border-sidebar-border dark:bg-gray-900">
           <h3 class="mb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Distribution</h3>
-          <PieChart />
+          <div class="h-48">
+            <PieChart />
+          </div>
         </div>
         <div class="rounded-xl border border-sidebar-border/70 bg-white p-4 shadow-sm dark:border-sidebar-border dark:bg-gray-900">
           <h3 class="mb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Trends</h3>
-          <LineGraph />
+          <div class="h-48">
+            <LineGraph />
+          </div>
         </div>
       </div>
       <div class="flex-1 rounded-xl border border-sidebar-border/70 bg-white p-4 shadow-sm dark:border-sidebar-border dark:bg-gray-900">

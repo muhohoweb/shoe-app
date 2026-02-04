@@ -8,6 +8,7 @@ ChartJS.register(Title, Tooltip, Legend, ArcElement);
 const props = defineProps<{
   data: Array<{
     status: 'pending' | 'completed' | 'failed';
+    amount: string;
   }>;
 }>();
 
@@ -21,26 +22,39 @@ const chartData = computed(() => {
     datasets: [{
       data: [completed, pending, failed],
       backgroundColor: ['#22c55e', '#f97316', '#ef4444'],
+      hoverOffset: 8,
     }]
   };
 });
 
 const chartOptions = {
   responsive: true,
+  maintainAspectRatio: false,
   plugins: {
     legend: {
       position: 'bottom' as const,
+      labels: {
+        boxWidth: 12,
+        padding: 8,
+        font: { size: 11 },
+      },
     },
     title: {
-      display: true,
-      text: 'Transaction Status',
+      display: false,
     },
+    tooltip: {
+      callbacks: {
+        label: (context: any) => {
+          const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+          const percentage = ((context.raw / total) * 100).toFixed(1);
+          return `${context.label}: ${context.raw} (${percentage}%)`;
+        }
+      }
+    }
   },
 };
 </script>
 
 <template>
-  <div class="w-80">
-    <Doughnut :data="chartData" :options="chartOptions" />
-  </div>
+  <Doughnut :data="chartData" :options="chartOptions" />
 </template>
