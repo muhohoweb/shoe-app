@@ -137,11 +137,14 @@ const handleDragChange = (newStatus: OrderStatus, evt: any) => {
       status: newStatus,
       payment_status: order.payment_status,
       tracking_number: order.tracking_number || '',
+      send_dispatch: newStatus === 'completed', // Flag to trigger WhatsApp
     }, {
       preserveScroll: true,
       onSuccess: () => {
         toast.success('Order Updated', {
-          description: `Order moved to ${newStatus}.`,
+          description: newStatus === 'completed'
+              ? `Order completed. Dispatch notification sent.`
+              : `Order moved to ${newStatus}.`,
         })
       },
       onError: () => {
