@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MpesaController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
@@ -13,9 +14,9 @@ use App\Http\Controllers\CategoryController;
 Route::get('/', [ShopController::class, 'index'])->name('home');
 
 
-Route::get('dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+
+
+Route::get('dashboard',[DashboardController::class,'index'])->name('dashboard');
 
 
 
