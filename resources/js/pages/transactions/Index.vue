@@ -71,7 +71,7 @@ const breadcrumbs: BreadcrumbItem[] = [
               :key="tx.id"
               :class="statusStyles[tx.status]"
           >
-            <td class="px-4 py-3 text-sm text-stone-900 dark:text-stone-100">{{ index++ }}</td>
+            <td class="px-4 py-3 text-sm text-stone-900 dark:text-stone-100">{{ index=1 }}</td>
             <td class="px-4 py-3 text-sm text-stone-900 dark:text-stone-100">{{ tx.phone_number }}</td>
             <td class="px-4 py-3 text-sm font-medium text-stone-900 dark:text-stone-100">{{ tx.amount }}</td>
             <td class="px-4 py-3 text-sm text-stone-600 dark:text-stone-400">{{ tx.account_reference }}</td>
