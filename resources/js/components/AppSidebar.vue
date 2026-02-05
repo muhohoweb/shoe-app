@@ -18,8 +18,9 @@ import AppLogo from './AppLogo.vue';
 import categories from "@/routes/categories";
 import products from "@/routes/products";
 import orders from "@/routes/orders";
+import jobs from "@/routes/jobs";
 import transactions from "@/routes/transactions";
-import { LayoutGrid, FolderTree, Package, ShoppingCart, Banknote } from 'lucide-vue-next';
+import {LayoutGrid, FolderTree, Package, ShoppingCart, Banknote, Clock} from 'lucide-vue-next';
 
 const mainNavItems: NavItem[] = [
   { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
@@ -27,6 +28,7 @@ const mainNavItems: NavItem[] = [
   { title: 'Products', href: products.index(), icon: Package },
   { title: 'Orders', href: orders.index(), icon: ShoppingCart },
   { title: 'Transactions', href: transactions.index(), icon: Banknote },
+  { title: 'Schedules', href: jobs.index(), icon: Clock },
 ];
 
 const footerNavItems: NavItem[] = [];

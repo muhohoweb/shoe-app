@@ -4,6 +4,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MpesaController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\SchedulesController;
 use App\Http\Controllers\ShopController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\WhatsAppController;
@@ -42,6 +43,9 @@ Route::middleware(['auth'])->group(function () {
     Route::match(['get', 'post'], '/whatsapp/webhook', [WhatsAppController::class, 'webhook']);
     Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
     Route::post('/whatsapp/send-dispatch', [WhatsAppController::class, 'sendDispatchNotification']);
+
+    Route::apiResource('jobs', SchedulesController::class);
+    Route::post('/jobs/{id}/toggle', [SchedulesController::class, 'toggleStatus'])->name('jobs.toggle');
 
 });
 
