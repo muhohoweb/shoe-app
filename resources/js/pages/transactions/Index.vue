@@ -56,6 +56,7 @@ const breadcrumbs: BreadcrumbItem[] = [
         <table class="w-full">
           <thead>
           <tr class="bg-stone-100 dark:bg-stone-800">
+            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-300">#</th>
             <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-300">Phone</th>
             <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-300">Amount</th>
             <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-300">Reference</th>
