@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up()
     {
-        Schema::create('scheduled-jobs', function (Blueprint $table) {
+        Schema::create('schedules', function (Blueprint $table) {
             $table->id();
             $table->string('email');
             $table->enum('frequency', ['daily', 'weekly', 'bi-weekly', 'monthly', 'quarterly']);
