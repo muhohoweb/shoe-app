@@ -5,6 +5,7 @@ import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
 import TransactionsGraph from "@/components/graphs/TransactionsGraph.vue";
 import OrdersGraph from "@/components/graphs/OrdersGraph.vue";
+import { ShoppingCart, CheckCircle, Clock, CreditCard } from 'lucide-vue-next';
 
 const props = defineProps<{
   transactions: Array<{ id: number; status: 'pending' | 'completed' | 'failed' }>;
@@ -16,10 +17,38 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const stats = [
-  { label: 'Total Orders', value: props.orders.length },
-  { label: 'Completed', value: props.orders.filter(o => o.status === 'completed').length },
-  { label: 'Pending', value: props.orders.filter(o => o.status === 'pending').length },
-  { label: 'Transactions', value: props.transactions.length },
+  {
+    label: 'Total Orders',
+    value: props.orders.length,
+    icon: ShoppingCart,
+    gradient: 'from-blue-500 to-blue-600',
+    bgLight: 'bg-blue-50',
+    iconColor: 'text-blue-600',
+  },
+  {
+    label: 'Completed',
+    value: props.orders.filter(o => o.status === 'completed').length,
+    icon: CheckCircle,
+    gradient: 'from-emerald-500 to-emerald-600',
+    bgLight: 'bg-emerald-50',
+    iconColor: 'text-emerald-600',
+  },
+  {
+    label: 'Pending',
+    value: props.orders.filter(o => o.status === 'pending').length,
+    icon: Clock,
+    gradient: 'from-amber-500 to-amber-600',
+    bgLight: 'bg-amber-50',
+    iconColor: 'text-amber-600',
+  },
+  {
+    label: 'Transactions',
+    value: props.transactions.length,
+    icon: CreditCard,
+    gradient: 'from-violet-500 to-violet-600',
+    bgLight: 'bg-violet-50',
+    iconColor: 'text-violet-600',
+  },
 ];
 </script>
 
@@ -34,10 +63,18 @@ const stats = [
         <div
             v-for="stat in stats"
             :key="stat.label"
-            class="rounded-xl border border-sidebar-border/70 bg-white p-5 shadow-sm dark:border-sidebar-border dark:bg-gray-900"
+            class="relative overflow-hidden rounded-xl border border-sidebar-border/70 bg-white p-5 shadow-sm dark:border-sidebar-border dark:bg-gray-900"
         >
-          <p class="text-sm text-gray-500 dark:text-gray-400">{{ stat.label }}</p>
-          <p class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{{ stat.value }}</p>
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-500 dark:text-gray-400">{{ stat.label }}</p>
+              <p class="mt-1 text-3xl font-bold text-gray-900 dark:text-white">{{ stat.value }}</p>
+            </div>
+            <div :class="[stat.bgLight, 'rounded-full p-3 dark:bg-opacity-20']">
+              <component :is="stat.icon" :class="[stat.iconColor, 'h-6 w-6']" />
+            </div>
+          </div>
+          <div :class="['absolute bottom-0 left-0 h-1 w-full bg-gradient-to-r', stat.gradient]"></div>
         </div>
       </div>
 
