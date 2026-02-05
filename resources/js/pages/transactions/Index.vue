@@ -67,10 +67,11 @@ const breadcrumbs: BreadcrumbItem[] = [
           </thead>
           <tbody class="divide-y divide-stone-200 dark:divide-stone-700">
           <tr
-              v-for="tx in transactions"
+              v-for="(tx,index) in transactions"
               :key="tx.id"
               :class="statusStyles[tx.status]"
           >
+            <td class="px-4 py-3 text-sm text-stone-900 dark:text-stone-100">{{ index++ }}</td>
             <td class="px-4 py-3 text-sm text-stone-900 dark:text-stone-100">{{ tx.phone_number }}</td>
             <td class="px-4 py-3 text-sm font-medium text-stone-900 dark:text-stone-100">{{ tx.amount }}</td>
             <td class="px-4 py-3 text-sm text-stone-600 dark:text-stone-400">{{ tx.account_reference }}</td>
