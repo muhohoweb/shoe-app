@@ -208,6 +208,7 @@ const formatDate = (date: string) => {
       <!-- Main Content Grid -->
       <div class="grid gap-6 lg:grid-cols-3">
 
+
         <!-- Create/Edit Schedule Form Card -->
         <Card class="lg:col-span-1">
           <CardHeader>
