@@ -30,6 +30,7 @@ return new class extends Migration
             $table->longText('description');
             $table->enum('status', ['pending', 'processing', 'completed', 'cancelled'])->default('pending');
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
