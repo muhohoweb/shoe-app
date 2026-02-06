@@ -107,7 +107,7 @@ class ShopController extends Controller
                 phonenumber: $phone,
                 amount: $amount,
                 account_number: $accountReference,
-                callbackurl: env('MPESA_STK_CALLBACK'),
+                callbackurl: config('mpesa.callbacks.callback_url'),
                 transactionType: 'CustomerPayBillOnline'
             );
 

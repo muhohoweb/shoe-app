@@ -39,15 +39,17 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/settings/mpesa', [MpesaController::class, 'settings'])->name('mpesa.settings');
     Route::post('/settings/mpesa/balance', [MpesaController::class, 'queryBalance'])->name('mpesa.balance');
 
-    //WhatsApp callbacks
-    Route::match(['get', 'post'], '/whatsapp/webhook', [WhatsAppController::class, 'webhook']);
     Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
-    Route::post('/whatsapp/send-dispatch', [WhatsAppController::class, 'sendDispatchNotification']);
+
 
     Route::apiResource('jobs', SchedulesController::class);
     Route::post('/jobs/{id}/toggle', [SchedulesController::class, 'toggleStatus'])->name('jobs.toggle');
 
 });
+//WhatsApp callbacks
+Route::match(['get', 'post'], '/whatsapp/webhook', [WhatsAppController::class, 'webhook']);
+
+Route::post('/whatsapp/send-dispatch', [WhatsAppController::class, 'sendDispatchNotification']);
 
 // Public Shop Routes (no auth)
 Route::get('/shop', [ShopController::class, 'index'])->name('shop.index');
