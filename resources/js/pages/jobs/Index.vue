@@ -7,7 +7,6 @@ import { ref, watch } from 'vue';
 import axios from 'axios';
 import {
   Bell,
-  Mail,
   Settings,
   Trash2,
   Edit,
@@ -40,7 +39,6 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'vue-sonner';
 
-// Props from Inertia
 const props = defineProps<{
   success: boolean;
   data: any[];
@@ -50,7 +48,6 @@ const breadcrumbs: BreadcrumbItem[] = [
   { title: 'Report', href: index.url() },
 ];
 
-// State
 const isEnabled = ref(true);
 const isSubmitting = ref(false);
 const isEditMode = ref(false);
@@ -59,58 +56,44 @@ const schedules = ref(props.data || []);
 const isLoadingSchedules = ref(false);
 
 const reportForm = ref({
-  email: '',
   frequency: 'daily',
   scheduled_time: '08:00',
 });
 
-// Watch for prop changes (when Inertia reloads)
 watch(() => props.data, (newData) => {
   schedules.value = newData || [];
   isLoadingSchedules.value = false;
 });
 
-// Refresh schedules via Inertia
 const fetchSchedules = () => {
   isLoadingSchedules.value = true;
   router.reload({ only: ['data'] });
 };
 
-// Load schedule for editing
 const editSchedule = (schedule: any) => {
   isEditMode.value = true;
   editingScheduleId.value = schedule.id;
-  reportForm.value.email = schedule.email;
   reportForm.value.frequency = schedule.frequency;
   reportForm.value.scheduled_time = schedule.scheduled_time;
   isEnabled.value = schedule.is_enabled;
 
-  toast.info('Edit Mode', { description: `Editing schedule for ${schedule.email}` });
+  toast.info('Edit Mode', { description: `Editing schedule #${schedule.id}` });
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-// Reset form
 const resetForm = () => {
   isEditMode.value = false;
   editingScheduleId.value = null;
-  reportForm.value.email = '';
   reportForm.value.frequency = 'daily';
   reportForm.value.scheduled_time = '08:00';
   isEnabled.value = true;
 };
 
-// Submit form (create or update)
 const handleReportScheduleSubmit = async () => {
-  if (!reportForm.value.email) {
-    toast.error('Validation Error', { description: 'Please enter an email address.' });
-    return;
-  }
-
   isSubmitting.value = true;
 
   try {
     const payload = {
-      email: reportForm.value.email,
       frequency: reportForm.value.frequency,
       scheduled_time: reportForm.value.scheduled_time,
       is_enabled: isEnabled.value,
@@ -137,8 +120,7 @@ const handleReportScheduleSubmit = async () => {
   }
 };
 
-// Delete schedule
-const deleteSchedule = async (id: number, email: string) => {
+const deleteSchedule = async (id: number) => {
   toast.promise(
       axios.delete(destroy.url(id)),
       {
@@ -146,14 +128,13 @@ const deleteSchedule = async (id: number, email: string) => {
         success: () => {
           fetchSchedules();
           if (editingScheduleId.value === id) resetForm();
-          return `Schedule for ${email} has been deleted`;
+          return `Schedule has been deleted`;
         },
         error: 'Failed to delete schedule',
       }
   );
 };
 
-// Toggle schedule status
 const toggleScheduleStatus = async (schedule: any) => {
   try {
     const response = await axios.post(toggle.url(schedule.id));
@@ -166,7 +147,6 @@ const toggleScheduleStatus = async (schedule: any) => {
   }
 };
 
-// Get frequency label
 const getFrequencyLabel = (frequency: string) => {
   const labels: Record<string, string> = {
     'daily': 'Daily',
@@ -178,7 +158,6 @@ const getFrequencyLabel = (frequency: string) => {
   return labels[frequency] || frequency;
 };
 
-// Format date
 const formatDate = (date: string) => {
   if (!date) return 'Never';
   return new Date(date).toLocaleString('en-US', {
@@ -197,19 +176,15 @@ const formatDate = (date: string) => {
   <AppLayout :breadcrumbs="breadcrumbs">
     <div class="flex h-full flex-1 flex-col gap-6 overflow-x-auto rounded-xl p-6">
 
-      <!-- Header Section -->
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-3xl font-bold tracking-tight">Report</h1>
+          <h1 class="text-3xl font-bold tracking-tight">Schedules</h1>
           <p class="text-muted-foreground">Welcome back! Here's your clinic overview.</p>
         </div>
       </div>
 
-      <!-- Main Content Grid -->
       <div class="grid gap-6 lg:grid-cols-3">
 
-
-        <!-- Create/Edit Schedule Form Card -->
         <Card class="lg:col-span-1">
           <CardHeader>
             <div class="flex items-center justify-between">
@@ -227,12 +202,11 @@ const formatDate = (date: string) => {
               </Button>
             </div>
             <CardDescription>
-              {{ isEditMode ? 'Update the scheduled report settings' : 'Schedule automated reports to be sent to your email' }}
+              {{ isEditMode ? 'Update the scheduled report settings' : 'Schedule automated reports' }}
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
             <form @submit.prevent="handleReportScheduleSubmit" class="space-y-4">
-              <!-- Enable/Disable Toggle -->
               <div class="flex items-center justify-between space-x-2 rounded-lg border p-4">
                 <div class="flex-1 space-y-0.5">
                   <Label class="text-base font-medium">Enable Schedule</Label>
@@ -246,24 +220,6 @@ const formatDate = (date: string) => {
                 />
               </div>
 
-              <!-- Email Input -->
-              <div class="space-y-2">
-                <Label for="report-email">Email Address</Label>
-                <div class="relative">
-                  <Mail class="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                      id="report-email"
-                      v-model="reportForm.email"
-                      type="email"
-                      placeholder="your.email@clinic.com"
-                      class="pl-9"
-                      :disabled="!isEnabled"
-                      required
-                  />
-                </div>
-              </div>
-
-              <!-- Frequency Selection -->
               <div class="space-y-2">
                 <Label for="report-frequency">Report Frequency</Label>
                 <Select
@@ -283,7 +239,6 @@ const formatDate = (date: string) => {
                 </Select>
               </div>
 
-              <!-- Scheduled Time -->
               <div class="space-y-2">
                 <Label for="scheduled-time">Scheduled Time</Label>
                 <div class="relative">
@@ -300,7 +255,6 @@ const formatDate = (date: string) => {
 
               <Separator />
 
-              <!-- Submit Button -->
               <Button
                   type="submit"
                   class="w-full"
@@ -314,7 +268,6 @@ const formatDate = (date: string) => {
           </CardContent>
         </Card>
 
-        <!-- Existing Schedules Card -->
         <Card class="lg:col-span-2">
           <CardHeader>
             <div class="flex items-center justify-between">
@@ -335,12 +288,10 @@ const formatDate = (date: string) => {
             </div>
           </CardHeader>
           <CardContent>
-            <!-- Loading State -->
             <div v-if="isLoadingSchedules" class="flex items-center justify-center py-8">
               <div class="text-muted-foreground">Loading schedules...</div>
             </div>
 
-            <!-- Empty State -->
             <div v-else-if="schedules.length === 0" class="flex flex-col items-center justify-center py-12 text-center">
               <Calendar class="h-12 w-12 text-muted-foreground mb-4" />
               <h3 class="text-lg font-semibold mb-2">No Schedules Yet</h3>
@@ -349,7 +300,6 @@ const formatDate = (date: string) => {
               </p>
             </div>
 
-            <!-- Schedules List -->
             <div v-else class="space-y-4">
               <div
                   v-for="schedule in schedules"
@@ -358,11 +308,9 @@ const formatDate = (date: string) => {
                   :class="{ 'border-primary': editingScheduleId === schedule.id }"
               >
                 <div class="flex items-start justify-between">
-                  <!-- Schedule Info -->
                   <div class="flex-1 space-y-2">
                     <div class="flex items-center gap-2">
-                      <Mail class="h-4 w-4 text-muted-foreground" />
-                      <span class="font-medium">{{ schedule.email }}</span>
+                      <span class="font-medium">Schedule #{{ schedule.id }}</span>
                       <Badge :variant="schedule.is_enabled ? 'default' : 'secondary'">
                         <CheckCircle2 v-if="schedule.is_enabled" class="h-3 w-3 mr-1" />
                         <XCircle v-else class="h-3 w-3 mr-1" />
@@ -386,7 +334,6 @@ const formatDate = (date: string) => {
                     </div>
                   </div>
 
-                  <!-- Actions -->
                   <div class="flex items-center gap-2">
                     <Button
                         variant="ghost"
@@ -410,7 +357,7 @@ const formatDate = (date: string) => {
                     <Button
                         variant="ghost"
                         size="icon"
-                        @click="deleteSchedule(schedule.id, schedule.email)"
+                        @click="deleteSchedule(schedule.id)"
                         title="Delete"
                         class="text-destructive hover:text-destructive"
                     >
