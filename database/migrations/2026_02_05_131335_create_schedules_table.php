@@ -10,7 +10,6 @@ return new class extends Migration
     {
         Schema::create('schedules', function (Blueprint $table) {
             $table->id();
-            $table->string('email');
             $table->enum('frequency', ['daily', 'weekly', 'bi-weekly', 'monthly', 'quarterly']);
             $table->time('scheduled_time')->default('08:00:00');
             $table->boolean('is_enabled')->default(true);
@@ -22,6 +21,6 @@ return new class extends Migration
 
     public function down()
     {
-        Schema::dropIfExists('scheduled_reports');
+        Schema::dropIfExists('schedules');
     }
 };
