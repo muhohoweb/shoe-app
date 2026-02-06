@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Order;
 use App\Models\Schedule;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -24,26 +25,29 @@ class ScheduleCommand extends Command
      */
     protected $description = 'Command description';
 
-    /**
-     * Execute the console command.
-     */
     public function handle()
     {
         $schedules = Schedule::where('is_enabled', 1)->get();
 
         foreach ($schedules as $schedule) {
-            $now = Carbon::now();
+            $now = now();
             $scheduledTime = Carbon::parse($schedule->scheduled_time);
 
+            if ($now->format('H') !== $scheduledTime->format('H')) {
+                continue;
+            }
 
+            if ($this->shouldRun($schedule, $now)) {
+                Order::query()
+                    ->where(function($q) {
+                        $q->where('status', 'completed')
+                            ->orWhere('status', 'cancelled');
+                    })
+                    ->where('payment_status', 'paid')
+                    ->delete();
 
-            if ($now->format('H:i') === $scheduledTime->format('H:i')) {
-                if ($this->shouldRun($schedule, $now)) {
-                    Log::info("Schedule {$schedule->id} executed successfully");
-                    $schedule->update(['last_run_at' => $now]);
-                }
-            }else{
-                Log::info("Not time to run ".$scheduledTime);
+                Log::info("Schedule {$schedule->id} executed successfully");
+                $schedule->update(['last_run_at' => $now]);
             }
         }
     }
@@ -57,9 +61,9 @@ class ScheduleCommand extends Command
         $lastRun = Carbon::parse($schedule->last_run_at);
 
         return match($schedule->frequency) {
-            'daily' => $lastRun->diffInDays($now) >= 1,
-            'weekly' => $lastRun->diffInWeeks($now) >= 1,
-            'monthly' => $lastRun->diffInMonths($now) >= 1,
+            'daily' => $now->diffInDays($lastRun) >= 1,
+            'weekly' => $now->diffInWeeks($lastRun) >= 1,
+            'monthly' => $now->diffInMonths($lastRun) >= 1,
             default => false,
         };
     }
