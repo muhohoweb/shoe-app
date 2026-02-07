@@ -51,7 +51,7 @@ return [
         |The Mpesa Initator Name
         |------------------------------------------
         */
-    'initiator_name' => env('MPESA_INITIATOR_NAME', 'drmorchweb'),
+    'initiator_name' => env('MPESA_INITIATOR_NAME', 'drmorchopere'),
 
     /*-----------------------------------------
         |The Mpesa Initator Password
