@@ -32,10 +32,6 @@ const sidebarNavItems: NavItem[] = [
     title: 'M-Pesa',
     href: '/settings/mpesa',
   },
-  {
-    title: 'Schedules',
-    href: 'sch',
-  },
 ];
 
 const { isCurrentUrl } = useCurrentUrl();
