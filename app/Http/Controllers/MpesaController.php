@@ -63,8 +63,35 @@ class MpesaController extends Controller
         }
     }
 
-    public function transactionStatusResponse(Request $request){
-        Log::info(json_encode($request));
+    public function transactionStatusResult(Request $request)
+    {
+        Log::info('=== TRANSACTION STATUS RESULT ===');
+        Log::info($request->getContent());
+
+        $result = $request->input('Result');
+
+        if ($result && isset($result['ResultCode']) && $result['ResultCode'] == 0) {
+            $params = collect($result['ResultParameters']['ResultParameter'])
+                ->pluck('Value', 'Key');
+
+            Log::info('Transaction Status Params', $params->toArray());
+
+            $receipt = $params->get('ReceiptNo');
+            if ($receipt) {
+                MpesaTransaction::where('mpesa_receipt_number', $receipt)
+                    ->update([
+                        'status' => 'completed',
+                        'result_desc' => $result['ResultDesc'],
+                    ]);
+            }
+        } else {
+            Log::info('Transaction Status Failed', [
+                'code' => $result['ResultCode'] ?? 'unknown',
+                'desc' => $result['ResultDesc'] ?? 'unknown',
+            ]);
+        }
+
+        return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Accepted']);
     }
 
     /**
