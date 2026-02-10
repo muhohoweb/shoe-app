@@ -180,35 +180,36 @@ class MpesaController extends Controller
      */
     public function checkStatus(string $identifier)
     {
-//        $transaction = MpesaTransaction::query()->where('checkout_request_id', $identifier)
-//            ->orWhere('merchant_request_id', $identifier)
-//            ->orWhere('mpesa_receipt_number', $identifier)
-//            ->first();
-//
-//        if (!$transaction) {
-//            return response()->json(['status' => 'not_found'], 404);
-//        }
-        $shortcode = config('mpesa.shortcode');
-        $identiertype = 4;
-        $remarks = "ONLINE CHECK BALANCE";
+        try {
+            $response = Mpesa::transactionStatus(
+                $identifier,                                          // TransactionID (mpesa receipt like MBN31H462N)
+                config('mpesa.shortcode'),                           // PartyA (your shortcode)
+                4,                                                    // IdentifierType (4 = shortcode)
+                config('mpesa.callbacks.status_result_url'),         // ResultURL
+                config('mpesa.callbacks.balance_timeout_url'),       // QueueTimeOutURL
+                'TransactionStatusQuery',                            // Remarks
+                'OK'                                                  // Occasion
+            );
 
-     $response =    Mpesa::transactionStatus(
-            $shortcode,
-            $identifier,
-            $identiertype,
-            $remarks,
-         config('mpesa.callbacks.status_result_url'),
-         config('mpesa.callbacks.balance_timeout_url'),
-         4,
-         '',
-        );
+            $result = $response->json();
+            Log::info('Transaction Status Response', $result);
 
+            if (isset($result['ResponseCode']) && $result['ResponseCode'] === '0') {
+                return response()->json([
+                    'status' => 'queued',
+                    'message' => $result['ResponseDescription'],
+                    'conversation_id' => $result['ConversationID'] ?? null,
+                ]);
+            }
 
-        Log::info(json_encode($response));
-        return json_encode($response);
-        return response()->json([
-            'status' => 'ok',
-            'mpesa_receipt' => 'done'//$transaction->mpesa_receipt_number,
-        ]);
+            return response()->json([
+                'status' => 'error',
+                'message' => $result['ResponseDescription'] ?? 'Request failed',
+            ], 400);
+
+        } catch (\Exception $e) {
+            Log::error('Transaction Status Error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
     }
 }
