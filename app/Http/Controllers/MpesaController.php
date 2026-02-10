@@ -182,13 +182,13 @@ class MpesaController extends Controller
     {
         try {
             $response = Mpesa::transactionStatus(
-                $identifier,                                          // TransactionID (mpesa receipt like MBN31H462N)
-                config('mpesa.shortcode','3541347'),                           // PartyA (your shortcode)
-                4,                                                    // IdentifierType (4 = shortcode)
-                config('mpesa.callbacks.status_result_url'),         // ResultURL
-                config('mpesa.callbacks.balance_timeout_url'),       // QueueTimeOutURL
-                'TransactionStatusQuery',                            // Remarks
-                'OK'                                                  // Occasion
+                3541347,           // PartyA (shortcode)
+                $identifier,       // TransactionID (mpesa receipt)
+                4,                 // IdentifierType
+                'Check status',    // Remarks
+                config('mpesa.callbacks.status_result_url'),
+                config('mpesa.callbacks.balance_timeout_url'),
+                ''                 // Occasion (optional)
             );
 
             $result = $response->json();
@@ -198,13 +198,12 @@ class MpesaController extends Controller
                 return response()->json([
                     'status' => 'queued',
                     'message' => $result['ResponseDescription'],
-                    'conversation_id' => $result['ConversationID'] ?? null,
                 ]);
             }
 
             return response()->json([
                 'status' => 'error',
-                'message' => $result['ResponseDescription'] ?? 'Request failed',
+                'message' => $result['errorMessage'] ?? $result['ResponseDescription'] ?? 'Request failed',
             ], 400);
 
         } catch (\Exception $e) {
