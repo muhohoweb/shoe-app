@@ -59,6 +59,7 @@ Route::post('/shop/order', [ShopController::class, 'placeOrder'])->name('shop.or
 // M-Pesa Callbacks (no auth, no CSRF)
 Route::post('/mpesa/callback', [MpesaController::class, 'callback']);
 Route::post('/mpesa/balance/callback', [MpesaController::class, 'balanceCallback']);
+Route::post('/mpesa/status/result', [MpesaController::class, 'transactionStatusResponse']);
 Route::get('/mpesa/status/{identifier}', [MpesaController::class, 'checkStatus']);
 Route::get('/api/mpesa/balance', [MpesaController::class, 'getBalance']);
 

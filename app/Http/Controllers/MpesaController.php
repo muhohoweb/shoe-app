@@ -63,6 +63,10 @@ class MpesaController extends Controller
         }
     }
 
+    public function transactionStatusResponse(Request $request){
+        Log::info(json_encode($request));
+    }
+
     /**
      * Handle balance callback from Safaricom
      */
@@ -176,14 +180,14 @@ class MpesaController extends Controller
      */
     public function checkStatus(string $identifier)
     {
-        $transaction = MpesaTransaction::query()->where('checkout_request_id', $identifier)
-            ->orWhere('merchant_request_id', $identifier)
-            ->orWhere('mpesa_receipt_number', $identifier)
-            ->first();
-
-        if (!$transaction) {
-            return response()->json(['status' => 'not_found'], 404);
-        }
+//        $transaction = MpesaTransaction::query()->where('checkout_request_id', $identifier)
+//            ->orWhere('merchant_request_id', $identifier)
+//            ->orWhere('mpesa_receipt_number', $identifier)
+//            ->first();
+//
+//        if (!$transaction) {
+//            return response()->json(['status' => 'not_found'], 404);
+//        }
         $shortcode = config('mpesa.shortcode');
         $identiertype = 4;
         $remarks = "ONLINE CHECK BALANCE";
@@ -192,14 +196,19 @@ class MpesaController extends Controller
             $shortcode,
             $identifier,
             $identiertype,
-            $remarks
+            $remarks,
+         config('mpesa.callbacks.status_result_url'),
+         config('mpesa.callbacks.balance_timeout_url'),
+         4,
+         '',
         );
 
 
         Log::info(json_encode($response));
+        return json_encode($response);
         return response()->json([
-            'status' => $transaction->status,
-            'mpesa_receipt' => $transaction->mpesa_receipt_number,
+            'status' => 'ok',
+            'mpesa_receipt' => 'done'//$transaction->mpesa_receipt_number,
         ]);
     }
 }
