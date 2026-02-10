@@ -207,15 +207,30 @@ class MpesaController extends Controller
      */
     public function checkStatus(string $identifier)
     {
+        // First check if we already have the result locally
+        $transaction = MpesaTransaction::where('checkout_request_id', $identifier)
+            ->orWhere('merchant_request_id', $identifier)
+            ->orWhere('mpesa_receipt_number', $identifier)
+            ->first();
+
+        if ($transaction && $transaction->status !== 'pending') {
+            return response()->json([
+                'status' => $transaction->status,
+                'mpesa_receipt' => $transaction->mpesa_receipt_number,
+                'amount' => $transaction->amount,
+            ]);
+        }
+
+        // If still pending or not found locally, query Safaricom
         try {
             $response = Mpesa::transactionStatus(
-                3541347,           // PartyA (shortcode)
-                $identifier,       // TransactionID (mpesa receipt)
-                4,                 // IdentifierType
-                'Check status',    // Remarks
+                3541347,
+                $identifier,
+                4,
+                'Check status',
                 config('mpesa.callbacks.status_result_url'),
                 config('mpesa.callbacks.balance_timeout_url'),
-                ''                 // Occasion (optional)
+                ''
             );
 
             $result = $response->json();
@@ -224,13 +239,14 @@ class MpesaController extends Controller
             if (isset($result['ResponseCode']) && $result['ResponseCode'] === '0') {
                 return response()->json([
                     'status' => 'queued',
-                    'message' => $result['ResponseDescription'],
+                    'message' => 'Request sent to Safaricom. Check again in a few seconds.',
+                    'conversation_id' => $result['ConversationID'] ?? null,
                 ]);
             }
 
             return response()->json([
                 'status' => 'error',
-                'message' => $result['errorMessage'] ?? $result['ResponseDescription'] ?? 'Request failed',
+                'message' => $result['errorMessage'] ?? 'Request failed',
             ], 400);
 
         } catch (\Exception $e) {
