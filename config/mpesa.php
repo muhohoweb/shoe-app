@@ -39,7 +39,7 @@ return [
         |The Lipa na Mpesa Online ShortCode (Paybill Number)
         |-----------------------------------------------------------
     */
-    'shortcode' => env('MPESA_BUSINESS_SHORTCODE', '174379'),
+    'shortcode' => env('MPESA_BUSINESS_SHORTCODE', '3541347'),
 
     /*--------------------------------------------------------------
         |The Lipa na Mpesa Online ShortCode  (Till Number)

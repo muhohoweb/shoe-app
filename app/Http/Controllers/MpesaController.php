@@ -183,7 +183,7 @@ class MpesaController extends Controller
         try {
             $response = Mpesa::transactionStatus(
                 $identifier,                                          // TransactionID (mpesa receipt like MBN31H462N)
-                config('mpesa.shortcode'),                           // PartyA (your shortcode)
+                config('mpesa.shortcode','3541347'),                           // PartyA (your shortcode)
                 4,                                                    // IdentifierType (4 = shortcode)
                 config('mpesa.callbacks.status_result_url'),         // ResultURL
                 config('mpesa.callbacks.balance_timeout_url'),       // QueueTimeOutURL
