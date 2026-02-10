@@ -173,9 +173,12 @@ class MpesaController extends Controller
     /**
      * Check payment status
      */
-    public function checkStatus(string $checkoutRequestId)
+    public function checkStatus(string $identifier)
     {
-        $transaction = MpesaTransaction::where('checkout_request_id', $checkoutRequestId)->first();
+        $transaction = MpesaTransaction::query()->where('checkout_request_id', $identifier)
+            ->orWhere('merchant_request_id', $identifier)
+            ->orWhere('mpesa_receipt_number', $identifier)
+            ->first();
 
         if (!$transaction) {
             return response()->json(['status' => 'not_found'], 404);
