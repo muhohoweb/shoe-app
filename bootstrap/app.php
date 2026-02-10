@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'mpesa/callback',
             'mpesa/balance/callback',
+            'mpesa/status/result',
             'whatsapp/webhook',
             'whatsapp/webhook/',
             'whatsapp/send-dispatch/',
