@@ -7,6 +7,7 @@ use Iankumu\Mpesa\Facades\Mpesa;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use function Pest\Laravel\json;
 
 class MpesaController extends Controller
 {
@@ -183,7 +184,19 @@ class MpesaController extends Controller
         if (!$transaction) {
             return response()->json(['status' => 'not_found'], 404);
         }
+        $shortcode = config('mpesa.shortcode');
+        $identiertype = 4;
+        $remarks = "ONLINE CHECK BALANCE";
 
+     $response =    Mpesa::transactionStatus(
+            $shortcode,
+            $identifier,
+            $identiertype,
+            $remarks
+        );
+
+
+        Log::info(json_encode($response));
         return response()->json([
             'status' => $transaction->status,
             'mpesa_receipt' => $transaction->mpesa_receipt_number,
