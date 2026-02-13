@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { Edit, Trash2, Eye, Package, User, Phone, MapPin, PlusCircle } from 'lucide-vue-next';
+import { Edit, Trash2, Eye, Package, User, Phone, MapPin, PlusCircle, X } from 'lucide-vue-next';
 import {
   Table,
   TableBody,
@@ -44,6 +44,14 @@ import { toast } from 'vue-sonner'
 import { ref, computed, watch } from 'vue'
 import draggable from 'vuedraggable'
 
+interface Product {
+  id: number
+  name: string
+  price: number
+  colors: string[] | null
+  sizes: string[] | null
+}
+
 interface Item {
   id: number
   product_id: number
@@ -52,6 +60,14 @@ interface Item {
   price: number
   quantity: number
   product?: { id: number; name: string }
+}
+
+interface OrderItem {
+  product_id: number
+  quantity: number
+  price: number
+  size: string | null
+  color: string | null
 }
 
 interface Order {
@@ -74,6 +90,7 @@ type OrderStatus = Order['status']
 
 const props = defineProps<{
   orders?: { data: Order[]; links: any[] }
+  products?: Product[]
 }>()
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -88,7 +105,6 @@ const columns: { key: OrderStatus; label: string; color: string; bg: string; hov
   { key: 'cancelled', label: 'Cancelled', color: 'border-red-400', bg: 'bg-red-50 dark:bg-red-900/20', hoverBg: 'bg-red-100/50 dark:bg-red-900/40' },
 ]
 
-//test
 const paymentStatusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
   paid: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
@@ -138,7 +154,7 @@ const handleDragChange = (newStatus: OrderStatus, evt: any) => {
       status: newStatus,
       payment_status: order.payment_status,
       tracking_number: order.tracking_number || '',
-      send_dispatch: newStatus === 'completed', // Flag to trigger WhatsApp
+      send_dispatch: newStatus === 'completed',
     }, {
       preserveScroll: true,
       onSuccess: () => {
@@ -168,20 +184,99 @@ const createForm = useForm({
   town: '',
   description: '',
   status: 'pending',
+  items: [] as OrderItem[],
 })
+
+const currentItem = ref({
+  product_id: null as number | null,
+  quantity: 1,
+  price: 0,
+  size: null as string | null,
+  color: null as string | null,
+})
+
+const selectedProduct = computed(() => {
+  if (!currentItem.value.product_id) return null
+  return props.products?.find(p => p.id === currentItem.value.product_id)
+})
+
+const availableSizes = computed(() => selectedProduct.value?.sizes || [])
+const availableColors = computed(() => selectedProduct.value?.colors || [])
+
+const addItem = () => {
+  if (!currentItem.value.product_id || currentItem.value.quantity < 1) {
+    toast.error('Please select a product and quantity')
+    return
+  }
+
+  createForm.items.push({
+    product_id: currentItem.value.product_id,
+    quantity: currentItem.value.quantity,
+    price: currentItem.value.price,
+    size: currentItem.value.size,
+    color: currentItem.value.color,
+  })
+
+  currentItem.value = {
+    product_id: null,
+    quantity: 1,
+    price: 0,
+    size: null,
+    color: null,
+  }
+
+  updateTotalAmount()
+}
+
+const removeItem = (index: number) => {
+  createForm.items.splice(index, 1)
+  updateTotalAmount()
+}
+
+const updateTotalAmount = () => {
+  createForm.amount = createForm.items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+}
+
+const onProductSelect = (productId: string) => {
+  const product = props.products?.find(p => p.id === Number(productId))
+  if (product) {
+    currentItem.value.product_id = product.id
+    currentItem.value.price = product.price
+    currentItem.value.size = null
+    currentItem.value.color = null
+  }
+}
+
+const getProductName = (productId: number) => {
+  return props.products?.find(p => p.id === productId)?.name || 'Unknown'
+}
 
 const openCreateDialog = () => {
   createForm.reset()
+  createForm.items = []
   createForm.clearErrors()
+  currentItem.value = {
+    product_id: null,
+    quantity: 1,
+    price: 0,
+    size: null,
+    color: null,
+  }
   isCreateDialogOpen.value = true
 }
 
 const closeCreateDialog = () => {
   isCreateDialogOpen.value = false
   createForm.reset()
+  createForm.items = []
 }
 
 const handleCreateSubmit = () => {
+  if (createForm.items.length === 0) {
+    toast.error('Please add at least one item')
+    return
+  }
+
   createForm.post('/orders', {
     preserveScroll: true,
     onSuccess: () => {
@@ -412,13 +507,13 @@ const formatDate = (date: string) => {
 
     <!-- Create Dialog -->
     <Dialog v-model:open="isCreateDialogOpen">
-      <DialogContent class="sm:max-w-[700px]" @interact-outside="(e: Event) => e.preventDefault()">
+      <DialogContent class="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" @interact-outside="(e: Event) => e.preventDefault()">
         <DialogHeader>
           <DialogTitle>Create New Order</DialogTitle>
         </DialogHeader>
         <form @submit.prevent="handleCreateSubmit">
           <div class="grid gap-4 py-4">
-            <!-- Row 1: Customer Name and M-Pesa Number -->
+            <!-- Customer Details -->
             <div class="grid grid-cols-2 gap-4">
               <div class="grid gap-2">
                 <Label>Customer Name</Label>
@@ -430,61 +525,138 @@ const formatDate = (date: string) => {
               </div>
             </div>
 
-            <!-- Row 2: M-Pesa Code and Amount -->
-            <div class="grid grid-cols-2 gap-4">
-              <div class="grid gap-2">
-                <Label>M-Pesa Code</Label>
-                <Input v-model="createForm.mpesa_code" placeholder="SH12X3Y4Z5" />
-              </div>
-              <div class="grid gap-2">
-                <Label>Amount *</Label>
-                <Input v-model.number="createForm.amount" type="number" step="0.01" min="0" required />
-              </div>
-            </div>
-
-            <!-- Row 3: Payment Status and Order Status -->
-            <div class="grid grid-cols-2 gap-4">
-              <div class="grid gap-2">
-                <Label>Payment Status</Label>
-                <Select v-model="createForm.payment_status">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="failed">Failed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div class="grid gap-2">
-                <Label>Order Status</Label>
-                <Select v-model="createForm.status">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="processing">Processing</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <!-- Row 4: Town and Tracking Number -->
             <div class="grid grid-cols-2 gap-4">
               <div class="grid gap-2">
                 <Label>Town *</Label>
                 <Input v-model="createForm.town" placeholder="Nairobi" required />
               </div>
               <div class="grid gap-2">
-                <Label>Tracking Number</Label>
-                <Input v-model="createForm.tracking_number" placeholder="Optional" />
+                <Label>M-Pesa Code</Label>
+                <Input v-model="createForm.mpesa_code" placeholder="SH12X3Y4Z5" />
               </div>
             </div>
 
-            <!-- Row 5: Description (full width) -->
             <div class="grid gap-2">
               <Label>Description *</Label>
               <Input v-model="createForm.description" placeholder="Order details" required />
+            </div>
+
+            <!-- Items Section -->
+            <div class="border-t pt-4">
+              <Label class="text-base font-semibold mb-3 block">Order Items</Label>
+
+              <!-- Add Item Form -->
+              <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg space-y-3 mb-3">
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="grid gap-2">
+                    <Label>Product *</Label>
+                    <Select :model-value="currentItem.product_id?.toString()" @update:model-value="onProductSelect">
+                      <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem v-for="product in products" :key="product.id" :value="product.id.toString()">
+                          {{ product.name }} - KES {{ product.price }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div class="grid gap-2">
+                    <Label>Quantity *</Label>
+                    <Input v-model.number="currentItem.quantity" type="number" min="1" />
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                  <div class="grid gap-2">
+                    <Label>Price *</Label>
+                    <Input v-model.number="currentItem.price" type="number" step="0.01" min="0" />
+                  </div>
+                  <div class="grid gap-2" v-if="availableSizes.length > 0">
+                    <Label>Size</Label>
+                    <Select v-model="currentItem.size">
+                      <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem v-for="size in availableSizes" :key="size" :value="size">
+                          {{ size }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div class="grid gap-2" v-if="availableColors.length > 0">
+                    <Label>Color</Label>
+                    <Select v-model="currentItem.color">
+                      <SelectTrigger><SelectValue placeholder="Select color" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem v-for="color in availableColors" :key="color" :value="color">
+                          {{ color }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <Button type="button" @click="addItem" variant="outline" class="w-full">
+                  Add Item
+                </Button>
+              </div>
+
+              <!-- Items List -->
+              <div v-if="createForm.items.length > 0" class="space-y-2">
+                <div v-for="(item, index) in createForm.items" :key="index" class="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded border">
+                  <div class="flex-1">
+                    <p class="font-medium text-sm">{{ getProductName(item.product_id) }}</p>
+                    <p class="text-xs text-gray-500">
+                      Qty: {{ item.quantity }} × KES {{ item.price }}
+                      <span v-if="item.size"> • Size: {{ item.size }}</span>
+                      <span v-if="item.color"> • Color: {{ item.color }}</span>
+                    </p>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <span class="font-semibold text-sm">KES {{ (item.quantity * item.price).toLocaleString() }}</span>
+                    <button type="button" @click="removeItem(index)" class="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                      <X class="h-4 w-4 text-red-500" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Order Summary -->
+            <div class="border-t pt-4">
+              <div class="flex justify-between items-center mb-4">
+                <span class="font-semibold">Total Amount:</span>
+                <span class="text-xl font-bold">KES {{ createForm.amount.toLocaleString() }}</span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div class="grid gap-2">
+                  <Label>Payment Status</Label>
+                  <Select v-model="createForm.payment_status">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="paid">Paid</SelectItem>
+                      <SelectItem value="failed">Failed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div class="grid gap-2">
+                  <Label>Order Status</Label>
+                  <Select v-model="createForm.status">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="processing">Processing</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div class="grid gap-2 mt-4">
+                <Label>Tracking Number</Label>
+                <Input v-model="createForm.tracking_number" placeholder="Optional" />
+              </div>
             </div>
           </div>
           <DialogFooter>

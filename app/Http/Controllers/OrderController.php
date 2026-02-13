@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class OrderController extends Controller
@@ -17,7 +19,51 @@ class OrderController extends Controller
                 ->with('items.product')
                 ->latest()
                 ->paginate(15),
+            'products' => Product::where('is_active', true)
+                ->where('status', 'active')
+                ->select('id', 'name', 'price', 'colors', 'sizes')
+                ->get(),
         ]);
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'customer_name' => 'nullable|string|max:255',
+            'mpesa_number' => 'required|string|max:255',
+            'mpesa_code' => 'nullable|string|max:255',
+            'amount' => 'required|numeric|min:0',
+            'payment_status' => 'required|in:pending,paid,failed',
+            'tracking_number' => 'nullable|string',
+            'town' => 'required|string|max:255',
+            'description' => 'required|string',
+            'status' => 'required|in:pending,processing,completed,cancelled',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.price' => 'required|numeric|min:0',
+            'items.*.size' => 'nullable|string',
+            'items.*.color' => 'nullable|string',
+        ]);
+
+        $order = Order::create([
+            'uuid' => Str::uuid(),
+            'customer_name' => $validated['customer_name'],
+            'mpesa_number' => $validated['mpesa_number'],
+            'mpesa_code' => $validated['mpesa_code'],
+            'amount' => $validated['amount'],
+            'payment_status' => $validated['payment_status'],
+            'tracking_number' => $validated['tracking_number'],
+            'town' => $validated['town'],
+            'description' => $validated['description'],
+            'status' => $validated['status'],
+        ]);
+
+        foreach ($validated['items'] as $item) {
+            $order->items()->create($item);
+        }
+
+        return back();
     }
 
     public function update(Request $request, Order $order)
