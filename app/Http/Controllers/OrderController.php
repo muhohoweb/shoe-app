@@ -16,13 +16,24 @@ class OrderController extends Controller
     {
         return Inertia::render('orders/Index', [
             'orders' => Order::query()
-                ->with('items.product')
+                ->with(['items.product.images'])
                 ->latest()
                 ->paginate(15),
             'products' => Product::where('is_active', true)
                 ->where('status', 'active')
+                ->with('images')
                 ->select('id', 'name', 'price', 'colors', 'sizes')
-                ->get(),
+                ->get()
+                ->map(function ($product) {
+                    return [
+                        'id' => $product->id,
+                        'name' => $product->name,
+                        'price' => $product->price,
+                        'colors' => $product->colors,
+                        'sizes' => $product->sizes,
+                        'image_path' => $product->images->first()?->path,
+                    ];
+                }),
         ]);
     }
 
