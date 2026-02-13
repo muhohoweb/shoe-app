@@ -88,6 +88,7 @@ const columns: { key: OrderStatus; label: string; color: string; bg: string; hov
   { key: 'cancelled', label: 'Cancelled', color: 'border-red-400', bg: 'bg-red-50 dark:bg-red-900/20', hoverBg: 'bg-red-100/50 dark:bg-red-900/40' },
 ]
 
+//test
 const paymentStatusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
   paid: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
