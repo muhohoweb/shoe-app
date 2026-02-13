@@ -50,6 +50,7 @@ interface Product {
   price: number
   colors: string[] | null
   sizes: string[] | null
+  image_path?: string
 }
 
 interface Item {
@@ -59,7 +60,11 @@ interface Item {
   color: string | null
   price: number
   quantity: number
-  product?: { id: number; name: string }
+  product?: {
+    id: number
+    name: string
+    image_path?: string
+  }
 }
 
 interface OrderItem {
@@ -429,72 +434,95 @@ const formatDate = (date: string) => {
                 @change="(evt: any) => handleDragChange(column.key, evt)"
             >
               <template #item="{ element: order }">
-                <div class="kanban-card bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing">
-                  <!-- Card Header -->
-                  <div class="flex items-start justify-between mb-2">
-                    <span class="font-mono text-xs text-gray-500 dark:text-gray-400">
-                      #{{ order.uuid.slice(0, 8) }}
-                    </span>
-                    <span
-                        class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                        :class="paymentStatusColors[order.payment_status]"
-                    >
-                      {{ order.payment_status }}
-                    </span>
+                <div class="kanban-card bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing overflow-hidden">
+
+                  <!-- Product Image Header -->
+                  <div class="relative h-32 bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                    <img
+                        v-if="order.items?.[0]?.product?.image_path"
+                        :src="`/storage/${order.items[0].product.image_path}`"
+                        :alt="order.items[0].product?.name"
+                        class="w-full h-full object-cover"
+                    />
+                    <div v-else class="w-full h-full flex items-center justify-center">
+                      <Package class="h-12 w-12 text-gray-400" />
+                    </div>
+                    <!-- Dark Overlay -->
+                    <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70"></div>
+
+                    <!-- Order Number & Payment Status on Image -->
+                    <div class="absolute top-2 left-2 right-2 flex items-start justify-between">
+                      <span class="font-mono text-xs text-white font-semibold bg-black/30 backdrop-blur-sm px-2 py-1 rounded">
+                        #{{ order.uuid.slice(0, 8) }}
+                      </span>
+                      <span
+                          class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium backdrop-blur-sm"
+                          :class="paymentStatusColors[order.payment_status]"
+                      >
+                        {{ order.payment_status }}
+                      </span>
+                    </div>
+
+                    <!-- Amount on Image -->
+                    <div class="absolute bottom-2 left-2">
+                      <span class="font-bold text-white text-lg drop-shadow-lg">
+                        KES {{ Number(order.amount).toLocaleString() }}
+                      </span>
+                    </div>
+
+                    <!-- Items Count Badge -->
+                    <div class="absolute bottom-2 right-2">
+                      <span class="inline-flex items-center gap-1 text-xs text-white bg-black/40 backdrop-blur-sm px-2 py-1 rounded font-medium">
+                        <Package class="h-3 w-3" />
+                        {{ order.items?.length || 0 }}
+                      </span>
+                    </div>
                   </div>
 
-                  <!-- Customer Info -->
-                  <div class="space-y-1 mb-3">
-                    <div class="flex items-center gap-2 text-sm">
-                      <User class="h-3.5 w-3.5 text-gray-400" />
-                      <span class="font-medium truncate">{{ order.customer_name || 'N/A' }}</span>
+                  <!-- Card Content -->
+                  <div class="p-3">
+                    <!-- Customer Info -->
+                    <div class="space-y-1 mb-3">
+                      <div class="flex items-center gap-2 text-sm">
+                        <User class="h-3.5 w-3.5 text-gray-400" />
+                        <span class="font-medium truncate">{{ order.customer_name || 'N/A' }}</span>
+                      </div>
+                      <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                        <Phone class="h-3 w-3" />
+                        <span>{{ order.mpesa_number }}</span>
+                      </div>
+                      <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                        <MapPin class="h-3 w-3" />
+                        <span>{{ order.town }}</span>
+                      </div>
                     </div>
-                    <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      <Phone class="h-3 w-3" />
-                      <span>{{ order.mpesa_number }}</span>
-                    </div>
-                    <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      <MapPin class="h-3 w-3" />
-                      <span>{{ order.town }}</span>
-                    </div>
-                  </div>
 
-                  <!-- Amount & Items -->
-                  <div class="flex items-center justify-between mb-3">
-                    <span class="font-semibold text-sm">
-                      KES {{ Number(order.amount).toLocaleString() }}
-                    </span>
-                    <span class="inline-flex items-center gap-1 text-xs text-gray-500">
-                      <Package class="h-3 w-3" />
-                      {{ order.items?.length || 0 }} items
-                    </span>
-                  </div>
-
-                  <!-- Card Footer -->
-                  <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-                    <span class="text-xs text-gray-400">{{ formatDate(order.created_at) }}</span>
-                    <div class="flex items-center gap-1">
-                      <button
-                          @click.stop="openViewDialog(order)"
-                          class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                          title="View"
-                      >
-                        <Eye class="h-4 w-4 text-gray-500" />
-                      </button>
-                      <button
-                          @click.stop="openEditDialog(order)"
-                          class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                          title="Edit"
-                      >
-                        <Edit class="h-4 w-4 text-blue-500" />
-                      </button>
-                      <button
-                          @click.stop="openDeleteDialog(order)"
-                          class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                          title="Delete"
-                      >
-                        <Trash2 class="h-4 w-4 text-red-500" />
-                      </button>
+                    <!-- Card Footer -->
+                    <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
+                      <span class="text-xs text-gray-400">{{ formatDate(order.created_at) }}</span>
+                      <div class="flex items-center gap-1">
+                        <button
+                            @click.stop="openViewDialog(order)"
+                            class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                            title="View"
+                        >
+                          <Eye class="h-4 w-4 text-gray-500" />
+                        </button>
+                        <button
+                            @click.stop="openEditDialog(order)"
+                            class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                            title="Edit"
+                        >
+                          <Edit class="h-4 w-4 text-blue-500" />
+                        </button>
+                        <button
+                            @click.stop="openDeleteDialog(order)"
+                            class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                            title="Delete"
+                        >
+                          <Trash2 class="h-4 w-4 text-red-500" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
