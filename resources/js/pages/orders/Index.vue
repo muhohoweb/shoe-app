@@ -440,7 +440,7 @@ const formatDate = (date: string) => {
                   <div class="relative h-32 bg-gray-200 dark:bg-gray-700 overflow-hidden">
                     <img
                         v-if="order.items?.[0]?.product?.images?.[0]?.path"
-                        :src="`/storage/${order.items[0].product.images[0].path}`"
+                        :src="order.items[0].product.images[0].path"
                         :alt="order.items[0].product?.name"
                         class="w-full h-full object-cover"
                     />
@@ -450,7 +450,33 @@ const formatDate = (date: string) => {
                     <!-- Rest of the overlay code remains the same -->
                     <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70"></div>
 
-                    <!-- ... rest of the card ... -->
+                    <!-- Order Number & Payment Status on Image -->
+                    <div class="absolute top-2 left-2 right-2 flex items-start justify-between">
+    <span class="font-mono text-xs text-white font-semibold bg-black/30 backdrop-blur-sm px-2 py-1 rounded">
+      #{{ order.uuid.slice(0, 8) }}
+    </span>
+                      <span
+                          class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium backdrop-blur-sm"
+                          :class="paymentStatusColors[order.payment_status]"
+                      >
+      {{ order.payment_status }}
+    </span>
+                    </div>
+
+                    <!-- Amount on Image -->
+                    <div class="absolute bottom-2 left-2">
+    <span class="font-bold text-white text-lg drop-shadow-lg">
+      KES {{ Number(order.amount).toLocaleString() }}
+    </span>
+                    </div>
+
+                    <!-- Items Count Badge -->
+                    <div class="absolute bottom-2 right-2">
+    <span class="inline-flex items-center gap-1 text-xs text-white bg-black/40 backdrop-blur-sm px-2 py-1 rounded font-medium">
+      <Package class="h-3 w-3" />
+      {{ order.items?.length || 0 }}
+    </span>
+                    </div>
                   </div>
 
                   <!-- Card Content -->
