@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { Edit, Trash2, Eye, Package, User, Phone, MapPin } from 'lucide-vue-next';
+import { Edit, Trash2, Eye, Package, User, Phone, MapPin, PlusCircle } from 'lucide-vue-next';
 import {
   Table,
   TableBody,
@@ -155,6 +155,42 @@ const handleDragChange = (newStatus: OrderStatus, evt: any) => {
   }
 }
 
+// ─── Create Modal ───────────────────────────────────────────────
+const isCreateDialogOpen = ref(false)
+const createForm = useForm({
+  customer_name: '',
+  mpesa_number: '',
+  mpesa_code: '',
+  amount: 0,
+  payment_status: 'pending',
+  tracking_number: '',
+  town: '',
+  description: '',
+  status: 'pending',
+})
+
+const openCreateDialog = () => {
+  createForm.reset()
+  createForm.clearErrors()
+  isCreateDialogOpen.value = true
+}
+
+const closeCreateDialog = () => {
+  isCreateDialogOpen.value = false
+  createForm.reset()
+}
+
+const handleCreateSubmit = () => {
+  createForm.post('/orders', {
+    preserveScroll: true,
+    onSuccess: () => {
+      toast.success('Order Created')
+      closeCreateDialog()
+    },
+    onError: () => toast.error('Creation Failed'),
+  })
+}
+
 // ─── View Modal ─────────────────────────────────────────────────
 const isViewDialogOpen = ref(false)
 const viewingOrder = ref<Order | null>(null)
@@ -247,6 +283,10 @@ const formatDate = (date: string) => {
     <div class="flex h-full flex-1 flex-col gap-4 p-4">
       <div class="flex items-center justify-between">
         <h2 class="text-xl font-semibold">Orders Board</h2>
+        <Button @click="openCreateDialog">
+          <PlusCircle class="h-4 w-4 mr-2" />
+          New Order
+        </Button>
       </div>
 
       <!-- Kanban Board -->
@@ -368,6 +408,76 @@ const formatDate = (date: string) => {
         </div>
       </div>
     </div>
+
+    <!-- Create Dialog -->
+    <Dialog v-model:open="isCreateDialogOpen">
+      <DialogContent class="sm:max-w-[500px]" @interact-outside="(e: Event) => e.preventDefault()">
+        <DialogHeader>
+          <DialogTitle>Create New Order</DialogTitle>
+        </DialogHeader>
+        <form @submit.prevent="handleCreateSubmit">
+          <div class="grid gap-4 py-4">
+            <div class="grid gap-2">
+              <Label>Customer Name</Label>
+              <Input v-model="createForm.customer_name" placeholder="John Doe" />
+            </div>
+            <div class="grid gap-2">
+              <Label>M-Pesa Number *</Label>
+              <Input v-model="createForm.mpesa_number" placeholder="254712345678" required />
+            </div>
+            <div class="grid gap-2">
+              <Label>M-Pesa Code</Label>
+              <Input v-model="createForm.mpesa_code" placeholder="SH12X3Y4Z5" />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="grid gap-2">
+                <Label>Amount *</Label>
+                <Input v-model.number="createForm.amount" type="number" step="0.01" min="0" required />
+              </div>
+              <div class="grid gap-2">
+                <Label>Payment Status</Label>
+                <Select v-model="createForm.payment_status">
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="failed">Failed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div class="grid gap-2">
+              <Label>Town *</Label>
+              <Input v-model="createForm.town" placeholder="Nairobi" required />
+            </div>
+            <div class="grid gap-2">
+              <Label>Description *</Label>
+              <Input v-model="createForm.description" placeholder="Order details" required />
+            </div>
+            <div class="grid gap-2">
+              <Label>Tracking Number</Label>
+              <Input v-model="createForm.tracking_number" placeholder="Optional" />
+            </div>
+            <div class="grid gap-2">
+              <Label>Order Status</Label>
+              <Select v-model="createForm.status">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" @click="closeCreateDialog">Cancel</Button>
+            <Button type="submit" :disabled="createForm.processing">Create Order</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
 
     <!-- View Dialog -->
     <Dialog v-model:open="isViewDialogOpen">
