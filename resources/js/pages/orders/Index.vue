@@ -412,29 +412,38 @@ const formatDate = (date: string) => {
 
     <!-- Create Dialog -->
     <Dialog v-model:open="isCreateDialogOpen">
-      <DialogContent class="sm:max-w-[500px]" @interact-outside="(e: Event) => e.preventDefault()">
+      <DialogContent class="sm:max-w-[700px]" @interact-outside="(e: Event) => e.preventDefault()">
         <DialogHeader>
           <DialogTitle>Create New Order</DialogTitle>
         </DialogHeader>
         <form @submit.prevent="handleCreateSubmit">
           <div class="grid gap-4 py-4">
-            <div class="grid gap-2">
-              <Label>Customer Name</Label>
-              <Input v-model="createForm.customer_name" placeholder="John Doe" />
-            </div>
-            <div class="grid gap-2">
-              <Label>M-Pesa Number *</Label>
-              <Input v-model="createForm.mpesa_number" placeholder="254712345678" required />
-            </div>
-            <div class="grid gap-2">
-              <Label>M-Pesa Code</Label>
-              <Input v-model="createForm.mpesa_code" placeholder="SH12X3Y4Z5" />
-            </div>
+            <!-- Row 1: Customer Name and M-Pesa Number -->
             <div class="grid grid-cols-2 gap-4">
+              <div class="grid gap-2">
+                <Label>Customer Name</Label>
+                <Input v-model="createForm.customer_name" placeholder="John Doe" />
+              </div>
+              <div class="grid gap-2">
+                <Label>M-Pesa Number *</Label>
+                <Input v-model="createForm.mpesa_number" placeholder="254712345678" required />
+              </div>
+            </div>
+
+            <!-- Row 2: M-Pesa Code and Amount -->
+            <div class="grid grid-cols-2 gap-4">
+              <div class="grid gap-2">
+                <Label>M-Pesa Code</Label>
+                <Input v-model="createForm.mpesa_code" placeholder="SH12X3Y4Z5" />
+              </div>
               <div class="grid gap-2">
                 <Label>Amount *</Label>
                 <Input v-model.number="createForm.amount" type="number" step="0.01" min="0" required />
               </div>
+            </div>
+
+            <!-- Row 3: Payment Status and Order Status -->
+            <div class="grid grid-cols-2 gap-4">
               <div class="grid gap-2">
                 <Label>Payment Status</Label>
                 <Select v-model="createForm.payment_status">
@@ -446,30 +455,36 @@ const formatDate = (date: string) => {
                   </SelectContent>
                 </Select>
               </div>
+              <div class="grid gap-2">
+                <Label>Order Status</Label>
+                <Select v-model="createForm.status">
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="processing">Processing</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div class="grid gap-2">
-              <Label>Town *</Label>
-              <Input v-model="createForm.town" placeholder="Nairobi" required />
+
+            <!-- Row 4: Town and Tracking Number -->
+            <div class="grid grid-cols-2 gap-4">
+              <div class="grid gap-2">
+                <Label>Town *</Label>
+                <Input v-model="createForm.town" placeholder="Nairobi" required />
+              </div>
+              <div class="grid gap-2">
+                <Label>Tracking Number</Label>
+                <Input v-model="createForm.tracking_number" placeholder="Optional" />
+              </div>
             </div>
+
+            <!-- Row 5: Description (full width) -->
             <div class="grid gap-2">
               <Label>Description *</Label>
               <Input v-model="createForm.description" placeholder="Order details" required />
-            </div>
-            <div class="grid gap-2">
-              <Label>Tracking Number</Label>
-              <Input v-model="createForm.tracking_number" placeholder="Optional" />
-            </div>
-            <div class="grid gap-2">
-              <Label>Order Status</Label>
-              <Select v-model="createForm.status">
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="processing">Processing</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
           <DialogFooter>
