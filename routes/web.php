@@ -33,7 +33,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/products/{id}', [ProductController::class, 'destroy'])->name('products.destroy');
 
 
-    Route::resource('orders', OrderController::class)->only(['index', 'update', 'destroy']);
+    Route::resource('orders', OrderController::class)->only(['index', 'store', 'update', 'destroy']);
 
     // M-Pesa Settings & Balance
     Route::get('/settings/mpesa', [MpesaController::class, 'settings'])->name('mpesa.settings');
