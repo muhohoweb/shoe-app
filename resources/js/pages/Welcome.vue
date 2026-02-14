@@ -28,6 +28,32 @@ const isPolling = ref(false)
 // Window width for responsive behavior
 const windowWidth = ref(window.innerWidth)
 
+// Touch handling for mobile swipe
+const touchStartX = ref(0)
+const touchEndX = ref(0)
+
+const handleTouchStart = (e: TouchEvent) => {
+  touchStartX.value = e.touches[0].clientX
+}
+
+const handleTouchEnd = (e: TouchEvent) => {
+  touchEndX.value = e.changedTouches[0].clientX
+  handleSwipe()
+}
+
+const handleSwipe = () => {
+  const swipeThreshold = 50
+  const diff = touchStartX.value - touchEndX.value
+
+  if (Math.abs(diff) > swipeThreshold) {
+    if (diff > 0 && currentImageIndex.value < productImages.value.length - 1) {
+      nextImage()
+    } else if (diff < 0 && currentImageIndex.value > 0) {
+      prevImage()
+    }
+  }
+}
+
 onMounted(() => {
   const flash = (page.props as any).flash
   if (flash?.orderSuccess) {
@@ -145,7 +171,7 @@ const hasMultipleImages = computed(() => {
 
 // Zoom styles
 const mainImageStyle = computed(() => {
-  if (!isZoomed.value || !isHovering.value) return {}
+  if (!isZoomed.value || !isHovering.value || windowWidth.value <= 768) return {}
 
   const x = (mouseX.value / 100) * -50
   const y = (mouseY.value / 100) * -50
@@ -158,7 +184,7 @@ const mainImageStyle = computed(() => {
 })
 
 const zoomLensStyle = computed(() => {
-  if (!isZoomed.value || !isHovering.value) return { display: 'none' }
+  if (!isZoomed.value || !isHovering.value || windowWidth.value <= 768) return { display: 'none' }
 
   return {
     position: 'absolute',
@@ -177,7 +203,7 @@ const zoomLensStyle = computed(() => {
 })
 
 const handleImageMouseMove = (e: MouseEvent) => {
-  if (!isZoomed.value || !isHovering.value) return
+  if (!isZoomed.value || !isHovering.value || windowWidth.value <= 768) return
 
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
   const x = ((e.clientX - rect.left) / rect.width) * 100
@@ -189,7 +215,9 @@ const handleImageMouseMove = (e: MouseEvent) => {
 }
 
 const handleImageMouseEnter = () => {
-  isHovering.value = true
+  if (windowWidth.value > 768) {
+    isHovering.value = true
+  }
 }
 
 const handleImageMouseLeave = () => {
@@ -554,6 +582,8 @@ const getProductImage = (product: any) => {
                 @mouseleave="handleImageMouseLeave"
                 @mousemove="handleImageMouseMove"
                 @click="toggleZoom"
+                @touchstart="handleTouchStart"
+                @touchend="handleTouchEnd"
             >
               <img
                   v-if="currentImage"
@@ -1493,6 +1523,7 @@ body {
   position: relative;
   cursor: zoom-in;
   overflow: hidden;
+  touch-action: pan-y;
 }
 
 .carousel-main-image {
@@ -1500,6 +1531,8 @@ body {
   height: 100%;
   object-fit: cover;
   transition: transform 0.3s ease;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .carousel-main-image.zoomed {
@@ -1603,7 +1636,7 @@ body {
   bottom: 16px;
   left: 0;
   right: 0;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
@@ -2491,58 +2524,8 @@ body {
 
 /* Responsive Breakpoints */
 @media (max-width: 768px) {
-  .product-modal-content {
-    grid-template-columns: 1fr;
-    overflow-y: auto;
-  }
-
-  .carousel-section {
-    padding: 16px;
-  }
-
-  .details-section {
-    padding: 24px;
-  }
-
-  .carousel-thumbnail {
-    width: 60px;
-    height: 60px;
-  }
-
-  .checkout-form {
-    grid-template-columns: 1fr;
-  }
-
-  .form-group.full-width {
-    grid-column: span 1;
-  }
-
-  .product-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .hero-section {
-    height: 400px;
-  }
-
-  .hero-content {
-    align-items: flex-end;
-    padding-bottom: 40px;
-  }
-
-  .cart-drawer {
-    max-width: 100%;
-  }
-
-  .carousel-nav-arrow {
-    display: none;
-  }
-}
-
-@media (max-width: 480px) {
   .nav-container {
+    height: 56px;
     padding: 0 16px;
   }
 
@@ -2564,7 +2547,7 @@ body {
   }
 
   .product-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 16px;
   }
 
@@ -2575,12 +2558,92 @@ body {
     border-radius: 0;
   }
 
+  .product-modal-content {
+    grid-template-columns: 1fr;
+    max-height: 100vh;
+  }
+
   .carousel-section {
-    padding: 12px;
+    padding: 16px;
+    max-height: 50vh;
+  }
+
+  .carousel-main-container {
+    max-height: 45vh;
   }
 
   .details-section {
     padding: 20px;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  /* Hide desktop-only elements */
+  .carousel-nav-arrow,
+  .zoom-hint,
+  .zoom-lens {
+    display: none !important;
+  }
+
+  /* Disable zoom on mobile */
+  .carousel-main-wrapper {
+    cursor: default !important;
+  }
+
+  .carousel-main-image.zoomed {
+    transform: none !important;
+    cursor: default !important;
+  }
+
+  /* Show mobile navigation */
+  .mobile-carousel-nav {
+    display: flex !important;
+  }
+
+  .carousel-thumbnails {
+    display: none;
+  }
+
+  .checkout-form {
+    grid-template-columns: 1fr;
+  }
+
+  .form-group.full-width {
+    grid-column: span 1;
+  }
+
+  .product-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .hero-content {
+    align-items: flex-end;
+    padding-bottom: 40px;
+  }
+
+  .cart-drawer {
+    max-width: 100%;
+  }
+
+  .modal-close-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .product-name {
+    font-size: 20px;
+  }
+
+  .product-price-large {
+    font-size: 18px;
+    padding: 6px 12px;
+  }
+
+  .add-to-cart-btn {
+    padding: 14px 20px;
+    font-size: 14px;
   }
 
   .quantity-btn {
@@ -2617,8 +2680,7 @@ body {
   }
 }
 
-/* Handle very small screens */
-@media (max-width: 360px) {
+@media (max-width: 480px) {
   .color-btn {
     padding: 6px 12px;
     font-size: 12px;
