@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, useForm, usePage } from '@inertiajs/vue3'
 import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
-import { ShoppingCart, X, Plus, Minus, ArrowRight, Phone, MapPin, User, Truck, Loader2 } from 'lucide-vue-next'
+import { ShoppingCart, X, Plus, Minus, ArrowRight, Phone, MapPin, User, Truck, Loader2, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 const props = defineProps<{
@@ -111,16 +111,141 @@ const selectedSize = ref<string>('')
 const selectedColor = ref<string>('')
 const detailQuantity = ref(1)
 
+// ─── Image Gallery State ────────────────────────────────────────────────────
+const currentImageIndex = ref(0)
+const isZoomed = ref(false)
+const mouseX = ref(0)
+const mouseY = ref(0)
+const isHovering = ref(false)
+const zoomLensSize = 150
+const zoomFactor = 2
+
+const productImages = computed(() => {
+  if (!selectedProduct.value?.images?.length) return []
+  return selectedProduct.value.images.map((img: any) => {
+    const path = img.path
+    return path.startsWith('uploads/') ? '/' + path : '/' + path.replace('products/', 'uploads/')
+  })
+})
+
+const currentImage = computed(() => {
+  return productImages.value[currentImageIndex.value] || null
+})
+
+const hasMultipleImages = computed(() => {
+  return productImages.value.length > 1
+})
+
+// Zoom styles
+const mainImageStyle = computed(() => {
+  if (!isZoomed.value || !isHovering.value) return {}
+
+  const x = (mouseX.value / 100) * -50
+  const y = (mouseY.value / 100) * -50
+
+  return {
+    transform: `scale(${zoomFactor}) translate(${x}px, ${y}px)`,
+    transition: 'transform 0.1s ease-out',
+    cursor: 'zoom-in'
+  }
+})
+
+const zoomLensStyle = computed(() => {
+  if (!isZoomed.value || !isHovering.value) return { display: 'none' }
+
+  return {
+    position: 'absolute',
+    width: `${zoomLensSize}px`,
+    height: `${zoomLensSize}px`,
+    left: `${mouseX.value}%`,
+    top: `${mouseY.value}%`,
+    transform: 'translate(-50%, -50%)',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    border: '2px solid #fff',
+    borderRadius: '50%',
+    pointerEvents: 'none',
+    boxShadow: '0 0 10px rgba(0,0,0,0.2)',
+    zIndex: 10
+  }
+})
+
+const handleImageMouseMove = (e: MouseEvent) => {
+  if (!isZoomed.value || !isHovering.value) return
+
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const x = ((e.clientX - rect.left) / rect.width) * 100
+  const y = ((e.clientY - rect.top) / rect.height) * 100
+
+  // Constrain values to prevent edge issues
+  mouseX.value = Math.min(100, Math.max(0, x))
+  mouseY.value = Math.min(100, Math.max(0, y))
+}
+
+const handleImageMouseEnter = () => {
+  isHovering.value = true
+}
+
+const handleImageMouseLeave = () => {
+  isHovering.value = false
+  mouseX.value = 0
+  mouseY.value = 0
+}
+
+const toggleZoom = () => {
+  isZoomed.value = !isZoomed.value
+  if (!isZoomed.value) {
+    mouseX.value = 0
+    mouseY.value = 0
+    isHovering.value = false
+  }
+}
+
+const prevImage = () => {
+  if (currentImageIndex.value > 0) {
+    currentImageIndex.value--
+    resetZoom()
+  }
+}
+
+const nextImage = () => {
+  if (currentImageIndex.value < productImages.value.length - 1) {
+    currentImageIndex.value++
+    resetZoom()
+  }
+}
+
+const selectImage = (index: number) => {
+  currentImageIndex.value = index
+  resetZoom()
+}
+
+const resetZoom = () => {
+  isZoomed.value = false
+  isHovering.value = false
+  mouseX.value = 0
+  mouseY.value = 0
+}
+
 const openProductDetail = (product: any) => {
   selectedProduct.value = product
   selectedSize.value = product.sizes?.[0] || ''
   selectedColor.value = product.colors?.[0] || ''
   detailQuantity.value = 1
+  currentImageIndex.value = 0
+  resetZoom()
 }
 
 const closeProductDetail = () => {
   selectedProduct.value = null
+  currentImageIndex.value = 0
+  resetZoom()
 }
+
+// Reset when product changes
+watch(selectedProduct, () => {
+  currentImageIndex.value = 0
+  resetZoom()
+})
 
 // ─── Add to Cart ────────────────────────────────────────────────────────────
 const addToCart = () => {
@@ -386,17 +511,17 @@ const getProductImage = (product: any) => {
     </section>
 
     <!-- WHATSAPP FLOATING BUTTON -->
-
     <a href="https://wa.me/254700801438?text=Hi%20DR.Morch%20Crafts%2C%20I%27d%20like%20to%20inquire%20about%20your%20shoes."
-    target="_blank"
-    rel="noopener noreferrer"
-    class="whatsapp-fab"
-    title="Chat with us on WhatsApp"
+       target="_blank"
+       rel="noopener noreferrer"
+       class="whatsapp-fab"
+       title="Chat with us on WhatsApp"
     >
-    <svg viewBox="0 0 24 24" width="28" height="28" fill="white">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-    </svg>
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="white">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+      </svg>
     </a>
+
     <!-- FOOTER -->
     <footer style="background: var(--charcoal); color: rgba(255,255,255,0.5); padding: 40px 24px; text-align: center;">
       <p class="font-display" style="font-size: 1.1rem; color: white; margin: 0 0 8px;">
@@ -420,89 +545,177 @@ const getProductImage = (product: any) => {
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
-  <!-- PRODUCT DETAIL MODAL                                                    -->
+  <!-- PRODUCT DETAIL MODAL WITH IMAGE GALLERY                                  -->
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <div v-if="selectedProduct" class="modal-overlay" @click.self="closeProductDetail">
-    <div class="product-modal">
+    <div class="product-modal product-modal-wide">
       <!-- Close Button -->
       <button @click="closeProductDetail" class="modal-close-btn">
         <X :size="18" />
       </button>
 
-      <!-- Image Section - Top Half -->
-      <div class="product-modal-image">
-        <img
-            v-if="getProductImage(selectedProduct)"
-            :src="getProductImage(selectedProduct)"
-            :alt="selectedProduct.name"
-        />
-        <div v-else class="product-modal-placeholder">
-          <ShoppingCart :size="48" style="color: #c5bfb5;" />
+      <!-- Two Column Layout -->
+      <div class="product-modal-grid">
+        <!-- Left Column - Image Gallery -->
+        <div class="product-modal-gallery">
+          <!-- Main Image with Zoom -->
+          <div class="gallery-main-container">
+            <div
+                class="gallery-main-image-wrapper"
+                @mouseenter="handleImageMouseEnter"
+                @mouseleave="handleImageMouseLeave"
+                @mousemove="handleImageMouseMove"
+                @click="toggleZoom"
+            >
+              <img
+                  v-if="currentImage"
+                  :src="currentImage"
+                  :alt="selectedProduct.name"
+                  class="gallery-main-image"
+                  :class="{ 'zoomed': isZoomed }"
+                  :style="mainImageStyle"
+              />
+              <div v-else class="gallery-main-placeholder">
+                <ShoppingCart :size="48" style="color: #c5bfb5;" />
+              </div>
+
+              <!-- Zoom Lens -->
+              <div v-if="isZoomed" class="zoom-lens" :style="zoomLensStyle"></div>
+
+              <!-- Zoom Hint -->
+              <div v-if="!isZoomed && hasMultipleImages" class="zoom-hint">
+                <span>Click to zoom</span>
+              </div>
+            </div>
+
+            <!-- Navigation Arrows -->
+            <button
+                v-if="hasMultipleImages && currentImageIndex > 0"
+                class="gallery-nav-arrow prev"
+                @click="prevImage"
+            >
+              <ChevronLeft :size="20" />
+            </button>
+            <button
+                v-if="hasMultipleImages && currentImageIndex < productImages.length - 1"
+                class="gallery-nav-arrow next"
+                @click="nextImage"
+            >
+              <ChevronRight :size="20" />
+            </button>
+
+            <!-- Image Counter -->
+            <div v-if="hasMultipleImages" class="gallery-counter">
+              {{ currentImageIndex + 1 }} / {{ productImages.length }}
+            </div>
+
+            <!-- Category Badge -->
+            <span class="product-modal-badge">{{ selectedProduct.category?.name }}</span>
+          </div>
+
+          <!-- Thumbnail Strip -->
+          <div v-if="hasMultipleImages" class="gallery-thumbnails">
+            <div
+                v-for="(image, index) in productImages"
+                :key="index"
+                class="gallery-thumbnail"
+                :class="{ 'active': currentImageIndex === index }"
+                @click="selectImage(index)"
+            >
+              <img :src="image" :alt="`${selectedProduct.name} ${index + 1}`" />
+            </div>
+          </div>
         </div>
-        <!-- Category Badge -->
-        <span class="product-modal-badge">{{ selectedProduct.category?.name }}</span>
-      </div>
 
-      <!-- Details Section - Bottom Half -->
-      <div class="product-modal-details">
-        <!-- Header: Name & Price -->
-        <div class="product-modal-header">
-          <h2 class="font-display">{{ selectedProduct.name }}</h2>
-          <span class="product-modal-price">{{ formatPrice(selectedProduct.price) }}</span>
-        </div>
+        <!-- Right Column - Product Info (Enhanced) -->
+        <div class="product-modal-details-scroll">
+          <!-- Breadcrumb -->
+          <div class="product-breadcrumb">
+            <span>Home</span>
+            <ArrowRight :size="12" />
+            <span>Fashion</span>
+            <ArrowRight :size="12" />
+            <span>{{ selectedProduct.category?.name || 'Dress' }}</span>
+          </div>
 
-        <!-- Description (truncated) -->
-        <p class="product-modal-desc">{{ selectedProduct.description }}</p>
+          <!-- Header -->
+          <div class="product-header">
+            <h2 class="product-name">{{ selectedProduct.name }}</h2>
+            <div class="product-price-large">{{ formatPrice(selectedProduct.price) }}</div>
+          </div>
 
-        <!-- Options Row: Color & Size side by side -->
-        <div class="product-modal-options">
-          <div v-if="selectedProduct.colors && selectedProduct.colors.length" class="option-group">
-            <label class="shop-label">Color</label>
-            <div class="option-pills">
+          <!-- Description -->
+          <p class="product-description">{{ selectedProduct.description || 'Premium quality product crafted with attention to detail.' }}</p>
+
+          <!-- Color Selection -->
+          <div v-if="selectedProduct.colors && selectedProduct.colors.length" class="product-section">
+            <h3 class="product-section-title">COLOR</h3>
+            <div class="color-pills">
               <button
                   v-for="color in selectedProduct.colors"
                   :key="color"
-                  class="pill-btn"
-                  :class="{ selected: selectedColor === color }"
+                  class="color-pill"
+                  :class="{ 'selected': selectedColor === color }"
                   @click="selectedColor = color"
-              >{{ color }}</button>
+              >
+                <span class="color-dot" :style="{ backgroundColor: color.toLowerCase() }"></span>
+                {{ color }}
+              </button>
             </div>
           </div>
 
-          <div v-if="selectedProduct.sizes && selectedProduct.sizes.length" class="option-group">
-            <label class="shop-label">Size</label>
-            <div class="option-pills">
+          <!-- Size Selection -->
+          <div v-if="selectedProduct.sizes && selectedProduct.sizes.length" class="product-section">
+            <h3 class="product-section-title">SIZE</h3>
+            <div class="size-pills">
               <button
                   v-for="size in selectedProduct.sizes"
                   :key="size"
-                  class="pill-btn"
-                  :class="{ selected: selectedSize === size }"
+                  class="size-pill"
+                  :class="{ 'selected': selectedSize === size }"
                   @click="selectedSize = size"
-              >{{ size }}</button>
+              >
+                {{ size }}
+              </button>
             </div>
           </div>
-        </div>
 
-        <!-- Footer: Quantity & Add to Cart -->
-        <div class="product-modal-footer">
-          <div class="qty-selector">
-            <button class="qty-btn-sm" @click="detailQuantity = Math.max(1, detailQuantity - 1)">
-              <Minus :size="14" />
-            </button>
-            <span class="qty-value">{{ detailQuantity }}</span>
-            <button class="qty-btn-sm" @click="detailQuantity = Math.min(selectedProduct.stock, detailQuantity + 1)">
-              <Plus :size="14" />
-            </button>
-            <span class="stock-info">{{ selectedProduct.stock }} in stock</span>
+          <!-- Stock Status -->
+          <div class="stock-status" :class="{ 'low': selectedProduct.stock < 10 }">
+            <span class="stock-dot"></span>
+            {{ selectedProduct.stock > 0 ? `${selectedProduct.stock} in stock` : 'Out of stock' }}
           </div>
 
-          <button
-              class="btn-add-cart"
-              :disabled="!selectedSize || !selectedColor"
-              @click="addToCart"
-          >
-            Add to Cart <span class="cart-price">{{ formatPrice(selectedProduct.price * detailQuantity) }}</span>
-          </button>
+          <!-- Quantity & Add to Cart -->
+          <div class="product-actions">
+            <div class="quantity-wrapper">
+              <button
+                  class="quantity-btn"
+                  @click="detailQuantity = Math.max(1, detailQuantity - 1)"
+                  :disabled="detailQuantity <= 1"
+              >
+                <Minus :size="16" />
+              </button>
+              <span class="quantity-value">{{ detailQuantity }}</span>
+              <button
+                  class="quantity-btn"
+                  @click="detailQuantity = Math.min(selectedProduct.stock, detailQuantity + 1)"
+                  :disabled="detailQuantity >= selectedProduct.stock"
+              >
+                <Plus :size="16" />
+              </button>
+            </div>
+
+            <button
+                class="add-to-cart-large"
+                :disabled="!selectedSize || !selectedColor || selectedProduct.stock === 0"
+                @click="addToCart"
+            >
+              <ShoppingCart :size="18" />
+              Add to Cart
+              <span class="cart-total">{{ formatPrice(selectedProduct.price * detailQuantity) }}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -737,6 +950,8 @@ body {
   background: var(--cream);
   color: var(--charcoal);
   -webkit-font-smoothing: antialiased;
+  margin: 0;
+  padding: 0;
 }
 
 .font-display { font-family: 'Playfair Display', serif; }
@@ -964,32 +1179,43 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
-/* PRODUCT DETAIL MODAL STYLES                                                 */
+/* ENHANCED PRODUCT MODAL WITH GALLERY STYLES                                  */
 /* ═══════════════════════════════════════════════════════════════════════════ */
 .product-modal {
   background: white;
   border-radius: 16px;
-  width: 420px;
   max-width: 92vw;
   max-height: 90vh;
   overflow: hidden;
   position: relative;
-  display: flex;
-  flex-direction: column;
   animation: slideUp 0.28s cubic-bezier(.22,1,.36,1);
   box-shadow: 0 25px 60px rgba(0,0,0,0.25);
+}
+
+.product-modal-wide {
+  max-width: 1000px;
+  width: 90vw;
+  max-height: 85vh;
+  overflow: hidden;
+}
+
+.product-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 100%;
+  overflow: hidden;
 }
 
 .modal-close-btn {
   position: absolute;
   top: 12px;
   right: 12px;
-  z-index: 10;
+  z-index: 20;
   background: rgba(255,255,255,0.95);
   backdrop-filter: blur(8px);
   border: none;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1004,30 +1230,64 @@ body {
   box-shadow: 0 4px 16px rgba(0,0,0,0.2);
 }
 
-.product-modal-image {
+/* Gallery Section */
+.product-modal-gallery {
+  padding: 24px;
+  background: #faf8f5;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.gallery-main-container {
   position: relative;
   width: 100%;
-  height: 280px;
-  background: linear-gradient(135deg, #f0ebe5 0%, #e5dfd6 100%);
+  aspect-ratio: 1;
+  border-radius: 16px;
+  overflow: hidden;
+  background: white;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.gallery-main-image-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  cursor: zoom-in;
   overflow: hidden;
 }
-.product-modal-image img {
+
+.gallery-main-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center;
+  transition: transform 0.3s ease;
 }
-.product-modal-placeholder {
+
+.gallery-main-image.zoomed {
+  transition: transform 0.1s ease;
+  cursor: grab;
+}
+
+.gallery-main-image.zoomed:active {
+  cursor: grabbing;
+}
+
+.gallery-main-placeholder {
   width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: linear-gradient(135deg, #f0ebe5 0%, #e5dfd6 100%);
 }
+
 .product-modal-badge {
   position: absolute;
-  bottom: 12px;
-  left: 12px;
+  bottom: 16px;
+  left: 16px;
   background: rgba(255,255,255,0.95);
   backdrop-filter: blur(8px);
   padding: 6px 12px;
@@ -1037,183 +1297,407 @@ body {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--accent-dark);
+  z-index: 5;
 }
 
-.product-modal-details {
-  padding: 20px 24px 24px;
+/* Zoom Lens */
+.zoom-lens {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 2px solid white;
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  transition: all 0.05s ease;
+  z-index: 10;
+}
+
+.zoom-hint {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 6px 14px;
+  border-radius: 30px;
+  font-size: 12px;
+  backdrop-filter: blur(4px);
+  z-index: 5;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 0.5; }
+}
+
+/* Gallery Navigation */
+.gallery-nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: white;
+  border: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
   display: flex;
-  flex-direction: column;
-  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  z-index: 15;
+  color: var(--charcoal);
 }
 
-.product-modal-header {
+.gallery-nav-arrow:hover {
+  transform: translateY(-50%) scale(1.1);
+  background: #f8f9fa;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.gallery-nav-arrow.prev {
+  left: 16px;
+}
+
+.gallery-nav-arrow.next {
+  right: 16px;
+}
+
+.gallery-counter {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  backdrop-filter: blur(4px);
+  z-index: 5;
+}
+
+/* Thumbnails */
+.gallery-thumbnails {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 0 8px;
+}
+
+.gallery-thumbnail {
+  width: 70px;
+  height: 70px;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.gallery-thumbnail:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.gallery-thumbnail.active {
+  border-color: var(--accent);
+  transform: scale(1.02);
+}
+
+.gallery-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Right Column - Enhanced Product Info */
+.product-modal-details-scroll {
+  padding: 32px;
+  overflow-y: auto;
+  background: white;
+  height: 100%;
+}
+
+.product-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 24px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.product-breadcrumb span:not(:last-child) {
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.product-breadcrumb span:not(:last-child):hover {
+  text-decoration: underline;
+}
+
+.product-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
+  margin-bottom: 16px;
+  gap: 20px;
 }
-.product-modal-header h2 {
-  font-size: 1.35rem;
+
+.product-name {
+  font-size: 28px;
   font-weight: 700;
   color: var(--charcoal);
-  margin: 0;
   line-height: 1.2;
+  margin: 0;
+  font-family: 'Playfair Display', serif;
 }
-.product-modal-price {
-  font-size: 1.2rem;
+
+.product-price-large {
+  font-size: 24px;
   font-weight: 700;
   color: var(--charcoal);
   white-space: nowrap;
   background: var(--cream);
-  padding: 6px 12px;
-  border-radius: 8px;
+  padding: 8px 16px;
+  border-radius: 12px;
 }
 
-.product-modal-desc {
-  font-size: 0.8rem;
+.product-description {
+  font-size: 14px;
   color: var(--text-muted);
-  line-height: 1.6;
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  line-height: 1.7;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f0ebe5;
 }
 
-.product-modal-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+.product-section {
+  margin-bottom: 24px;
 }
-.option-group {
+
+.product-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 12px 0;
+}
+
+/* Color Pills */
+.color-pills {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.option-group .shop-label {
-  margin: 0;
-  font-size: 0.68rem;
-}
-.option-pills {
-  display: flex;
-  gap: 6px;
+  gap: 10px;
   flex-wrap: wrap;
 }
-.pill-btn {
-  padding: 6px 12px;
-  border: 1.5px solid #e0d9d0;
-  border-radius: 20px;
+
+.color-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1.5px solid #e5dfd6;
+  border-radius: 40px;
   background: white;
-  font-size: 0.75rem;
+  font-size: 13px;
   font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
   color: var(--charcoal-soft);
-}
-.pill-btn:hover {
-  border-color: var(--accent);
-  background: #faf8f5;
-}
-.pill-btn.selected {
-  background: var(--charcoal);
-  color: white;
-  border-color: var(--charcoal);
-}
-
-.product-modal-footer {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding-top: 8px;
-  border-top: 1px solid #f0ebe5;
-}
-
-.qty-selector {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.qty-btn-sm {
-  width: 28px;
-  height: 28px;
-  border: 1.5px solid #e0d9d0;
-  background: white;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.15s;
-  color: var(--charcoal);
-}
-.qty-btn-sm:hover {
-  border-color: var(--charcoal);
-  background: var(--cream);
-}
-.qty-value {
-  font-size: 0.9rem;
-  font-weight: 600;
-  min-width: 24px;
-  text-align: center;
-}
-.stock-info {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  margin-left: auto;
-}
-
-.btn-add-cart {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  background: var(--charcoal);
-  color: white;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.82rem;
-  font-weight: 600;
-  padding: 14px 20px;
-  border: none;
-  border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s;
 }
-.btn-add-cart:hover {
-  background: var(--charcoal-soft);
+
+.color-pill:hover {
+  border-color: var(--accent);
+  background: #faf8f5;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
-.btn-add-cart:active {
-  transform: translateY(0);
+
+.color-pill.selected {
+  border-color: var(--charcoal);
+  background: var(--charcoal);
+  color: white;
 }
-.btn-add-cart:disabled {
+
+.color-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Size Pills */
+.size-pills {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.size-pill {
+  min-width: 50px;
+  padding: 10px 14px;
+  border: 1.5px solid #e5dfd6;
+  border-radius: 12px;
+  background: white;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--charcoal-soft);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.size-pill:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.size-pill.selected {
+  border-color: var(--charcoal);
+  background: var(--charcoal);
+  color: white;
+}
+
+/* Stock Status */
+.stock-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #f0f9f0;
+  border-radius: 40px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #2e7d32;
+  margin-bottom: 24px;
+}
+
+.stock-status.low {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.stock-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1.5s infinite;
+}
+
+/* Product Actions */
+.product-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.quantity-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: #f8f8f8;
+  padding: 8px;
+  border-radius: 50px;
+}
+
+.quantity-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: white;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  color: var(--charcoal);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.quantity-btn:hover:not(:disabled) {
+  background: var(--charcoal);
+  color: white;
+  transform: scale(1.05);
+}
+
+.quantity-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.quantity-value {
+  font-size: 18px;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: center;
+}
+
+.add-to-cart-large {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, var(--charcoal), #2d2d2d);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.add-to-cart-large:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+  background: var(--charcoal-soft);
+}
+
+.add-to-cart-large:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #9ca3af;
   transform: none;
   box-shadow: none;
 }
-.btn-add-cart .cart-price {
-  background: rgba(255,255,255,0.15);
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-weight: 700;
+
+.cart-total {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 12px;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
-@media (max-width: 480px) {
-  .product-modal {
-    width: 100%;
-    max-width: 100%;
-    max-height: 100vh;
-    border-radius: 0;
-  }
-  .product-modal-image {
-    height: 240px;
-  }
-  .product-modal-options {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
+/* Scrollbar for details panel */
+.product-modal-details-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.product-modal-details-scroll::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.product-modal-details-scroll::-webkit-scrollbar-thumb {
+  background: var(--accent-light);
+  border-radius: 2px;
 }
 
 /* WhatsApp Floating Button */
@@ -1239,5 +1723,35 @@ body {
 }
 .whatsapp-fab:active {
   transform: scale(0.95);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .product-modal-grid {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .product-modal-gallery {
+    padding: 16px;
+  }
+
+  .product-modal-details-scroll {
+    padding: 24px;
+  }
+
+  .gallery-thumbnail {
+    width: 60px;
+    height: 60px;
+  }
+
+  .product-name {
+    font-size: 22px;
+  }
+
+  .product-price-large {
+    font-size: 18px;
+    padding: 6px 12px;
+  }
 }
 </style>
