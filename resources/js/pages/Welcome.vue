@@ -25,11 +25,18 @@ const paymentStatus = ref<'pending' | 'completed' | 'failed' | null>(null)
 const mpesaReceipt = ref<string | null>(null)
 const isPolling = ref(false)
 
+// Window width for responsive behavior
+const windowWidth = ref(window.innerWidth)
+
 onMounted(() => {
   const flash = (page.props as any).flash
   if (flash?.orderSuccess) {
     orderSuccess.value = flash.orderSuccess
   }
+
+  window.addEventListener('resize', () => {
+    windowWidth.value = window.innerWidth
+  })
 })
 
 // Watch for order success and start polling
@@ -192,11 +199,13 @@ const handleImageMouseLeave = () => {
 }
 
 const toggleZoom = () => {
-  isZoomed.value = !isZoomed.value
-  if (!isZoomed.value) {
-    mouseX.value = 0
-    mouseY.value = 0
-    isHovering.value = false
+  if (windowWidth.value > 768) { // Only allow zoom on desktop
+    isZoomed.value = !isZoomed.value
+    if (!isZoomed.value) {
+      mouseX.value = 0
+      mouseY.value = 0
+      isHovering.value = false
+    }
   }
 }
 
@@ -527,7 +536,7 @@ const getProductImage = (product: any) => {
     </footer>
   </div>
 
-  <!-- PRODUCT DETAIL MODAL WITH RESPONSIVE IMAGE GALLERY -->
+  <!-- PRODUCT DETAIL MODAL WITH FULL CAROUSEL -->
   <div v-if="selectedProduct" class="modal-overlay" @click.self="closeProductDetail">
     <div class="product-modal">
       <button @click="closeProductDetail" class="modal-close-btn">
@@ -535,68 +544,68 @@ const getProductImage = (product: any) => {
       </button>
 
       <div class="product-modal-content">
-        <!-- Image Gallery Section - Responsive -->
-        <div class="gallery-section">
-          <div class="gallery-main-container">
+        <!-- Left Column - Image Carousel -->
+        <div class="carousel-section">
+          <!-- Main Image with Zoom (Desktop only) -->
+          <div class="carousel-main-container">
             <div
-                class="gallery-main-wrapper"
+                class="carousel-main-wrapper"
                 @mouseenter="handleImageMouseEnter"
                 @mouseleave="handleImageMouseLeave"
                 @mousemove="handleImageMouseMove"
                 @click="toggleZoom"
-                @touchstart="toggleZoom"
             >
               <img
                   v-if="currentImage"
                   :src="currentImage"
                   :alt="selectedProduct.name"
-                  class="gallery-main-image"
+                  class="carousel-main-image"
                   :class="{ 'zoomed': isZoomed }"
                   :style="isZoomed ? mainImageStyle : {}"
               />
-              <div v-else class="gallery-main-placeholder">
+              <div v-else class="carousel-main-placeholder">
                 <ShoppingCart :size="48" />
               </div>
 
-              <!-- Zoom Lens - Hidden on mobile -->
+              <!-- Zoom Lens - Desktop only -->
               <div v-if="isZoomed && windowWidth > 768" class="zoom-lens" :style="zoomLensStyle"></div>
 
-              <!-- Zoom Hint - Hidden on mobile -->
+              <!-- Zoom Hint - Desktop only -->
               <div v-if="!isZoomed && hasMultipleImages && windowWidth > 768" class="zoom-hint">
                 <span>Click to zoom</span>
               </div>
             </div>
 
-            <!-- Navigation Arrows - Hidden on mobile -->
+            <!-- Navigation Arrows - Desktop -->
             <button
                 v-if="hasMultipleImages && currentImageIndex > 0 && windowWidth > 768"
-                class="gallery-nav-arrow prev"
+                class="carousel-nav-arrow prev"
                 @click="prevImage"
             >
-              <ChevronLeft :size="20" />
+              <ChevronLeft :size="24" />
             </button>
             <button
                 v-if="hasMultipleImages && currentImageIndex < productImages.length - 1 && windowWidth > 768"
-                class="gallery-nav-arrow next"
+                class="carousel-nav-arrow next"
                 @click="nextImage"
             >
-              <ChevronRight :size="20" />
+              <ChevronRight :size="24" />
             </button>
 
             <!-- Image Counter -->
-            <div v-if="hasMultipleImages" class="gallery-counter">
+            <div v-if="hasMultipleImages" class="carousel-counter">
               {{ currentImageIndex + 1 }} / {{ productImages.length }}
             </div>
 
             <!-- Category Badge -->
             <span class="product-category-badge">{{ selectedProduct.category?.name }}</span>
 
-            <!-- Mobile Navigation Dots -->
-            <div v-if="hasMultipleImages && windowWidth <= 768" class="mobile-nav-dots">
+            <!-- Mobile Navigation -->
+            <div v-if="hasMultipleImages && windowWidth <= 768" class="mobile-carousel-nav">
               <button class="mobile-nav-btn prev" @click="prevImage" :disabled="currentImageIndex === 0">
-                <ChevronLeft :size="20" />
+                <ChevronLeft :size="24" />
               </button>
-              <div class="dot-indicators">
+              <div class="carousel-dots">
                 <span
                     v-for="(_, index) in productImages"
                     :key="index"
@@ -606,17 +615,17 @@ const getProductImage = (product: any) => {
                 ></span>
               </div>
               <button class="mobile-nav-btn next" @click="nextImage" :disabled="currentImageIndex === productImages.length - 1">
-                <ChevronRight :size="20" />
+                <ChevronRight :size="24" />
               </button>
             </div>
           </div>
 
-          <!-- Thumbnail Strip - Hidden on mobile -->
-          <div v-if="hasMultipleImages && windowWidth > 768" class="gallery-thumbnails">
+          <!-- Thumbnail Strip - Desktop -->
+          <div v-if="hasMultipleImages && windowWidth > 768" class="carousel-thumbnails">
             <div
                 v-for="(image, index) in productImages"
                 :key="index"
-                class="gallery-thumbnail"
+                class="carousel-thumbnail"
                 :class="{ 'active': currentImageIndex === index }"
                 @click="selectImage(index)"
             >
@@ -625,9 +634,9 @@ const getProductImage = (product: any) => {
           </div>
         </div>
 
-        <!-- Product Details Section -->
+        <!-- Right Column - Product Details -->
         <div class="details-section">
-          <!-- Breadcrumb - Responsive -->
+          <!-- Breadcrumb -->
           <div class="breadcrumb">
             <span>Home</span>
             <ArrowRight :size="12" />
@@ -636,26 +645,26 @@ const getProductImage = (product: any) => {
             <span>MEN</span>
           </div>
 
-          <!-- Header - Responsive -->
+          <!-- Header -->
           <div class="product-header">
-            <h2 class="product-name">{{ selectedProduct.name }}</h2>
-            <div class="product-price-large">{{ formatPrice(selectedProduct.price) }}</div>
+            <h2 class="product-name">{{ selectedProduct.name || 'i.march' }}</h2>
+            <div class="product-price-large">{{ formatPrice(selectedProduct.price || 5) }}</div>
           </div>
 
-          <!-- Description - Responsive -->
+          <!-- Description -->
           <p class="product-description">{{ selectedProduct.description || 'Test from the phone' }}</p>
 
           <!-- Phone order description -->
           <p class="order-description">Phone order description</p>
 
-          <!-- Color Selection - Responsive -->
+          <!-- Color Selection -->
           <div v-if="selectedProduct.colors && selectedProduct.colors.length" class="product-section">
             <h3 class="section-title">COLOR</h3>
-            <div class="color-pills">
+            <div class="color-options">
               <button
                   v-for="color in selectedProduct.colors"
                   :key="color"
-                  class="color-pill"
+                  class="color-btn"
                   :class="{ 'selected': selectedColor === color }"
                   @click="selectedColor = color"
               >
@@ -665,14 +674,14 @@ const getProductImage = (product: any) => {
             </div>
           </div>
 
-          <!-- Size Selection - Responsive -->
+          <!-- Size Selection -->
           <div v-if="selectedProduct.sizes && selectedProduct.sizes.length" class="product-section">
             <h3 class="section-title">SIZE</h3>
-            <div class="size-pills">
+            <div class="size-options">
               <button
                   v-for="size in selectedProduct.sizes"
                   :key="size"
-                  class="size-pill"
+                  class="size-btn"
                   :class="{ 'selected': selectedSize === size }"
                   @click="selectedSize = size"
               >
@@ -681,13 +690,13 @@ const getProductImage = (product: any) => {
             </div>
           </div>
 
-          <!-- Stock Status - Responsive -->
-          <div class="stock-status" :class="{ 'low': selectedProduct.stock < 10 }">
+          <!-- Stock Status -->
+          <div class="stock-status" :class="{ 'low': (selectedProduct.stock || 10) < 10 }">
             <span class="stock-dot"></span>
-            {{ selectedProduct.stock > 0 ? `${selectedProduct.stock} in stock` : 'Out of stock' }}
+            {{ (selectedProduct.stock || 10) > 0 ? `${selectedProduct.stock || 10} in stock` : 'Out of stock' }}
           </div>
 
-          <!-- Quantity & Add to Cart - Responsive -->
+          <!-- Quantity & Add to Cart -->
           <div class="product-actions">
             <div class="quantity-wrapper">
               <button
@@ -700,8 +709,8 @@ const getProductImage = (product: any) => {
               <span class="quantity-value">{{ detailQuantity }}</span>
               <button
                   class="quantity-btn"
-                  @click="detailQuantity = Math.min(selectedProduct.stock, detailQuantity + 1)"
-                  :disabled="detailQuantity >= selectedProduct.stock"
+                  @click="detailQuantity = Math.min((selectedProduct.stock || 10), detailQuantity + 1)"
+                  :disabled="detailQuantity >= (selectedProduct.stock || 10)"
               >
                 <Plus :size="16" />
               </button>
@@ -709,12 +718,12 @@ const getProductImage = (product: any) => {
 
             <button
                 class="add-to-cart-btn"
-                :disabled="!selectedSize || !selectedColor || selectedProduct.stock === 0"
+                :disabled="!selectedSize || !selectedColor || (selectedProduct.stock || 10) === 0"
                 @click="addToCart"
             >
               <ShoppingCart :size="18" />
               Add to Cart
-              <span class="cart-total">{{ formatPrice(selectedProduct.price * detailQuantity) }}</span>
+              <span class="cart-total">{{ formatPrice((selectedProduct.price || 5) * detailQuantity) }}</span>
             </button>
           </div>
         </div>
@@ -722,7 +731,7 @@ const getProductImage = (product: any) => {
     </div>
   </div>
 
-  <!-- CART DRAWER - Responsive -->
+  <!-- CART DRAWER -->
   <div v-if="isCartOpen" class="modal-overlay side-right" @click.self="isCartOpen = false">
     <div class="cart-drawer">
       <div class="cart-header">
@@ -776,7 +785,7 @@ const getProductImage = (product: any) => {
     </div>
   </div>
 
-  <!-- CHECKOUT MODAL - Responsive -->
+  <!-- CHECKOUT MODAL -->
   <div v-if="isCheckoutOpen" class="modal-overlay" @click.self="closeCheckout">
     <div class="checkout-modal">
       <button @click="closeCheckout" class="checkout-close-btn">
@@ -837,7 +846,7 @@ const getProductImage = (product: any) => {
     </div>
   </div>
 
-  <!-- ORDER SUCCESS MODAL - Responsive -->
+  <!-- ORDER SUCCESS MODAL -->
   <div v-if="isSuccessOpen" class="modal-overlay">
     <div class="success-modal">
       <!-- Pending Payment -->
@@ -1409,7 +1418,7 @@ body {
   to { opacity: 1; }
 }
 
-/* Product Modal - Responsive */
+/* Product Modal */
 .product-modal {
   background: white;
   border-radius: 16px;
@@ -1459,8 +1468,8 @@ body {
   box-shadow: 0 4px 16px rgba(0,0,0,0.2);
 }
 
-/* Gallery Section */
-.gallery-section {
+/* Carousel Section */
+.carousel-section {
   padding: 24px;
   background: #faf8f5;
   display: flex;
@@ -1468,7 +1477,7 @@ body {
   gap: 20px;
 }
 
-.gallery-main-container {
+.carousel-main-container {
   position: relative;
   width: 100%;
   aspect-ratio: 1;
@@ -1478,7 +1487,7 @@ body {
   box-shadow: 0 4px 20px rgba(0,0,0,0.05);
 }
 
-.gallery-main-wrapper {
+.carousel-main-wrapper {
   width: 100%;
   height: 100%;
   position: relative;
@@ -1486,19 +1495,19 @@ body {
   overflow: hidden;
 }
 
-.gallery-main-image {
+.carousel-main-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: transform 0.3s ease;
 }
 
-.gallery-main-image.zoomed {
+.carousel-main-image.zoomed {
   transition: transform 0.1s ease;
   cursor: grab;
 }
 
-.gallery-main-placeholder {
+.carousel-main-placeholder {
   width: 100%;
   height: 100%;
   display: flex;
@@ -1541,13 +1550,13 @@ body {
   50% { opacity: 0.5; }
 }
 
-/* Gallery Navigation */
-.gallery-nav-arrow {
+/* Carousel Navigation */
+.carousel-nav-arrow {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: white;
   border: none;
@@ -1561,21 +1570,21 @@ body {
   color: var(--charcoal);
 }
 
-.gallery-nav-arrow:hover {
+.carousel-nav-arrow:hover {
   transform: translateY(-50%) scale(1.1);
   background: #f8f9fa;
   box-shadow: 0 4px 16px rgba(0,0,0,0.2);
 }
 
-.gallery-nav-arrow.prev {
+.carousel-nav-arrow.prev {
   left: 16px;
 }
 
-.gallery-nav-arrow.next {
+.carousel-nav-arrow.next {
   right: 16px;
 }
 
-.gallery-counter {
+.carousel-counter {
   position: absolute;
   bottom: 16px;
   right: 16px;
@@ -1588,26 +1597,26 @@ body {
   z-index: 5;
 }
 
-/* Mobile Navigation Dots */
-.mobile-nav-dots {
+/* Mobile Carousel Navigation */
+.mobile-carousel-nav {
   position: absolute;
   bottom: 16px;
   left: 0;
   right: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 16px;
+  justify-content: space-between;
+  padding: 0 16px;
   z-index: 15;
 }
 
 .mobile-nav-btn {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: rgba(255,255,255,0.9);
   border: none;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1621,7 +1630,7 @@ body {
   cursor: not-allowed;
 }
 
-.dot-indicators {
+.carousel-dots {
   display: flex;
   gap: 8px;
 }
@@ -1632,23 +1641,24 @@ body {
   border-radius: 50%;
   background: rgba(255,255,255,0.5);
   transition: var(--transition);
+  cursor: pointer;
 }
 
 .dot.active {
-  width: 20px;
+  width: 24px;
   background: white;
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 /* Thumbnails */
-.gallery-thumbnails {
+.carousel-thumbnails {
   display: flex;
   gap: 12px;
   overflow-x: auto;
   padding: 4px 0 8px;
 }
 
-.gallery-thumbnail {
+.carousel-thumbnail {
   width: 70px;
   height: 70px;
   border-radius: 10px;
@@ -1661,17 +1671,17 @@ body {
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-.gallery-thumbnail:hover {
+.carousel-thumbnail:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
-.gallery-thumbnail.active {
+.carousel-thumbnail.active {
   border-color: var(--accent);
   transform: scale(1.02);
 }
 
-.gallery-thumbnail img {
+.carousel-thumbnail img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1757,14 +1767,14 @@ body {
   margin: 0 0 12px;
 }
 
-/* Color Pills */
-.color-pills {
+/* Color Options */
+.color-options {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.color-pill {
+.color-btn {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1779,13 +1789,13 @@ body {
   transition: var(--transition);
 }
 
-.color-pill:hover {
+.color-btn:hover {
   border-color: var(--accent);
   background: #faf8f5;
   transform: translateY(-1px);
 }
 
-.color-pill.selected {
+.color-btn.selected {
   border-color: var(--charcoal);
   background: var(--charcoal);
   color: white;
@@ -1798,14 +1808,14 @@ body {
   display: inline-block;
 }
 
-/* Size Pills */
-.size-pills {
+/* Size Options */
+.size-options {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.size-pill {
+.size-btn {
   min-width: 50px;
   padding: 10px 14px;
   border: 1.5px solid #e5dfd6;
@@ -1819,13 +1829,13 @@ body {
   text-align: center;
 }
 
-.size-pill:hover {
+.size-btn:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
-.size-pill.selected {
+.size-btn.selected {
   border-color: var(--charcoal);
   background: var(--charcoal);
   color: white;
@@ -1877,8 +1887,8 @@ body {
 }
 
 .quantity-btn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: none;
   background: white;
   border-radius: 50%;
@@ -1949,7 +1959,7 @@ body {
   font-weight: 500;
 }
 
-/* Cart Drawer - Responsive */
+/* Cart Drawer */
 .cart-drawer {
   background: white;
   width: 100%;
@@ -2070,8 +2080,8 @@ body {
 }
 
 .qty-btn-small {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border: 1px solid #d5cfc8;
   background: white;
   border-radius: 6px;
@@ -2128,7 +2138,7 @@ body {
   justify-content: center;
 }
 
-/* Checkout Modal - Responsive */
+/* Checkout Modal */
 .checkout-modal {
   background: white;
   border-radius: 16px;
@@ -2276,7 +2286,7 @@ body {
   justify-content: center;
 }
 
-/* Success Modal - Responsive */
+/* Success Modal */
 .success-modal {
   background: white;
   border-radius: 16px;
@@ -2486,7 +2496,7 @@ body {
     overflow-y: auto;
   }
 
-  .gallery-section {
+  .carousel-section {
     padding: 16px;
   }
 
@@ -2494,7 +2504,7 @@ body {
     padding: 24px;
   }
 
-  .gallery-thumbnail {
+  .carousel-thumbnail {
     width: 60px;
     height: 60px;
   }
@@ -2524,6 +2534,10 @@ body {
 
   .cart-drawer {
     max-width: 100%;
+  }
+
+  .carousel-nav-arrow {
+    display: none;
   }
 }
 
@@ -2561,12 +2575,17 @@ body {
     border-radius: 0;
   }
 
-  .gallery-section {
+  .carousel-section {
     padding: 12px;
   }
 
   .details-section {
     padding: 20px;
+  }
+
+  .quantity-btn {
+    width: 40px;
+    height: 40px;
   }
 
   .checkout-modal {
@@ -2600,15 +2619,19 @@ body {
 
 /* Handle very small screens */
 @media (max-width: 360px) {
-  .color-pill {
+  .color-btn {
     padding: 6px 12px;
     font-size: 12px;
   }
 
-  .size-pill {
+  .size-btn {
     min-width: 44px;
     padding: 8px 10px;
     font-size: 13px;
+  }
+
+  .quantity-wrapper {
+    gap: 8px;
   }
 
   .quantity-btn {
