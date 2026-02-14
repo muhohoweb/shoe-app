@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
-import { dashboard } from '@/routes';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm } from '@inertiajs/vue3';
-import { Edit, Trash2, Plus, Upload, X } from 'lucide-vue-next';
+import {dashboard} from '@/routes';
+import {type BreadcrumbItem} from '@/types';
+import {Head, router, useForm} from '@inertiajs/vue3';
+import {Edit, Trash2, Plus, Upload, X} from 'lucide-vue-next';
 import {
   Table,
   TableBody,
@@ -30,9 +30,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import {Button} from '@/components/ui/button'
+import {Input} from '@/components/ui/input'
+import {Label} from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -40,8 +40,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { toast } from 'vue-sonner'
-import { ref, computed } from 'vue'
+import {toast} from 'vue-sonner'
+import {ref, computed} from 'vue'
 import Pagination from '@/components/Pagination.vue'
 
 const props = defineProps<{
@@ -53,15 +53,23 @@ const props = defineProps<{
 }>()
 
 const breadcrumbs: BreadcrumbItem[] = [
-  { title: 'Dashboard', href: dashboard().url },
-  { title: 'Products' },
+  {title: 'Dashboard', href: dashboard().url},
+  {title: 'Products'},
 ]
 
 const productsList = computed(() => props.products?.data || [])
 const paginationLinks = computed(() => props.products?.links || [])
 
-const availableColors = ['white', 'black', 'red', 'blue', 'green', 'yellow', 'brown', 'beige', 'pink']
-const availableSizes = ['20', '21', '22', '28', '29', '30', '31', '36', '37', '38', '39', '40', '41', '42', '43', '44']
+const availableColors = [
+  'white',
+  'black',
+  'grey',
+  'dark tan',
+  'mid brown',
+  'light tan'
+];
+
+const availableSizes = ['20', '21', '22', '28', '29', '30', '31', '36', '37', '38', '39', '40', '41', '42', '43', '44','45',46,'47']
 
 const MAX_IMAGES = 3
 
@@ -72,7 +80,7 @@ interface ImagePreview {
 }
 
 function buildPreviews(files: File[]): ImagePreview[] {
-  return files.map((f) => ({ url: URL.createObjectURL(f), name: f.name }))
+  return files.map((f) => ({url: URL.createObjectURL(f), name: f.name}))
 }
 
 // ─── Add Modal ──────────────────────────────────────────────────
@@ -302,16 +310,17 @@ const closeDeleteDialog = () => {
 </script>
 
 <template>
-  <Head title="Products" />
+  <Head title="Products"/>
 
   <AppLayout :breadcrumbs="breadcrumbs">
     <div class="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
-      <div class="relative min-h-[100vh] flex-1 rounded-xl border border-gray-200 bg-white md:min-h-min dark:border-gray-700 dark:bg-gray-800">
+      <div
+          class="relative min-h-[100vh] flex-1 rounded-xl border border-gray-200 bg-white md:min-h-min dark:border-gray-700 dark:bg-gray-800">
         <div class="p-6">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-xl font-semibold">Products</h2>
             <Button @click="openAddDialog">
-              <Plus class="mr-2 h-4 w-4" />
+              <Plus class="mr-2 h-4 w-4"/>
               Add Product
             </Button>
           </div>
@@ -353,7 +362,7 @@ const closeDeleteDialog = () => {
                           v-else
                           class="h-10 w-10 rounded-md border border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center flex-shrink-0 bg-muted/50"
                       >
-                        <Upload class="h-4 w-4 text-muted-foreground" />
+                        <Upload class="h-4 w-4 text-muted-foreground"/>
                       </div>
                       <span>{{ product.name }}</span>
                     </div>
@@ -379,14 +388,14 @@ const closeDeleteDialog = () => {
                           @click="openEditDialog(product)"
                           class="inline-flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:hover:bg-blue-800"
                       >
-                        <Edit class="h-4 w-4" />
+                        <Edit class="h-4 w-4"/>
                         Edit
                       </button>
                       <button
                           @click="openDeleteDialog(product)"
                           class="inline-flex items-center gap-1 rounded-md bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-200 dark:hover:bg-red-800"
                       >
-                        <Trash2 class="h-4 w-4" />
+                        <Trash2 class="h-4 w-4"/>
                         Delete
                       </button>
                     </div>
@@ -400,7 +409,7 @@ const closeDeleteDialog = () => {
             <div class="text-sm text-gray-500 dark:text-gray-400">
               Showing {{ productsList.length }} products on this page
             </div>
-            <Pagination :links="paginationLinks" />
+            <Pagination :links="paginationLinks"/>
           </div>
         </div>
       </div>
@@ -408,7 +417,8 @@ const closeDeleteDialog = () => {
 
     <!-- ─── Add Product Dialog ──────────────────────────────────── -->
     <Dialog v-model:open="isAddDialogOpen">
-      <DialogContent class="sm:max-w-[650px] max-h-[90vh] overflow-y-auto" @interact-outside="(e) => e.preventDefault()">
+      <DialogContent class="sm:max-w-[650px] max-h-[90vh] overflow-y-auto"
+                     @interact-outside="(e) => e.preventDefault()">
         <DialogHeader>
           <DialogTitle>Add New Product</DialogTitle>
           <DialogDescription>Enter the product details below.</DialogDescription>
@@ -419,13 +429,13 @@ const closeDeleteDialog = () => {
             <div class="grid grid-cols-2 gap-4">
               <div class="grid gap-2">
                 <Label for="add-name">Name</Label>
-                <Input id="add-name" v-model="addForm.name" placeholder="Product name" required />
+                <Input id="add-name" v-model="addForm.name" placeholder="Product name" required/>
               </div>
               <div class="grid gap-2">
                 <Label for="add-category">Category</Label>
                 <Select v-model="addForm.category_id" required>
                   <SelectTrigger id="add-category">
-                    <SelectValue placeholder="Select category" />
+                    <SelectValue placeholder="Select category"/>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem v-for="cat in categories" :key="cat.id" :value="cat.id.toString()">
@@ -451,11 +461,11 @@ const closeDeleteDialog = () => {
             <div class="grid grid-cols-2 gap-4">
               <div class="grid gap-2">
                 <Label for="add-price">Price (KES)</Label>
-                <Input id="add-price" v-model="addForm.price" type="number" placeholder="0.00" min="0" required />
+                <Input id="add-price" v-model="addForm.price" type="number" placeholder="0.00" min="0" required/>
               </div>
               <div class="grid gap-2">
                 <Label for="add-stock">Stock</Label>
-                <Input id="add-stock" v-model="addForm.stock" type="number" placeholder="0" min="0" required />
+                <Input id="add-stock" v-model="addForm.stock" type="number" placeholder="0" min="0" required/>
               </div>
             </div>
 
@@ -511,16 +521,18 @@ const closeDeleteDialog = () => {
                     :key="index"
                     class="group relative aspect-square overflow-hidden rounded-lg border border-blue-300 dark:border-blue-800 ring-2 ring-blue-100 dark:ring-blue-900"
                 >
-                  <img :src="preview.url" alt="Preview" class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                  <div class="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/40" />
+                  <img :src="preview.url" alt="Preview"
+                       class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"/>
+                  <div class="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/40"/>
                   <button
                       type="button"
                       @click="removeAddImage(index)"
                       class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
                   >
-                    <X class="h-3 w-3" />
+                    <X class="h-3 w-3"/>
                   </button>
-                  <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <div
+                      class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                     <p class="text-xs text-white truncate">New</p>
                   </div>
                 </div>
@@ -550,7 +562,7 @@ const closeDeleteDialog = () => {
                 />
                 <div class="flex flex-col items-center justify-center gap-2 py-6 px-4">
                   <div class="rounded-full bg-muted p-3 dark:bg-muted/50" :class="addIsDragging ? 'bg-primary/10' : ''">
-                    <Upload class="h-5 w-5 text-muted-foreground" :class="addIsDragging ? 'text-primary' : ''" />
+                    <Upload class="h-5 w-5 text-muted-foreground" :class="addIsDragging ? 'text-primary' : ''"/>
                   </div>
                   <div class="text-center">
                     <p class="text-sm font-medium text-muted-foreground">
@@ -563,7 +575,8 @@ const closeDeleteDialog = () => {
                 </div>
               </div>
 
-              <div v-else class="rounded-lg border border-dashed border-gray-200 dark:border-gray-600 bg-muted/20 py-3 px-4 text-center">
+              <div v-else
+                   class="rounded-lg border border-dashed border-gray-200 dark:border-gray-600 bg-muted/20 py-3 px-4 text-center">
                 <p class="text-xs text-muted-foreground">Maximum of {{ MAX_IMAGES }} images reached</p>
               </div>
             </div>
@@ -579,7 +592,8 @@ const closeDeleteDialog = () => {
 
     <!-- ─── Edit Product Dialog ─────────────────────────────────── -->
     <Dialog v-model:open="isEditDialogOpen">
-      <DialogContent class="sm:max-w-[650px] max-h-[90vh] overflow-y-auto" @interact-outside="(e) => e.preventDefault()">
+      <DialogContent class="sm:max-w-[650px] max-h-[90vh] overflow-y-auto"
+                     @interact-outside="(e) => e.preventDefault()">
         <DialogHeader>
           <DialogTitle>Edit Product</DialogTitle>
           <DialogDescription>Update the product details below.</DialogDescription>
@@ -590,13 +604,13 @@ const closeDeleteDialog = () => {
             <div class="grid grid-cols-2 gap-4">
               <div class="grid gap-2">
                 <Label for="edit-name">Name</Label>
-                <Input id="edit-name" v-model="editForm.name" placeholder="Product name" required />
+                <Input id="edit-name" v-model="editForm.name" placeholder="Product name" required/>
               </div>
               <div class="grid gap-2">
                 <Label for="edit-category">Category</Label>
                 <Select v-model="editForm.category_id" required>
                   <SelectTrigger id="edit-category">
-                    <SelectValue placeholder="Select category" />
+                    <SelectValue placeholder="Select category"/>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem v-for="cat in categories" :key="cat.id" :value="cat.id.toString()">
@@ -622,11 +636,11 @@ const closeDeleteDialog = () => {
             <div class="grid grid-cols-2 gap-4">
               <div class="grid gap-2">
                 <Label for="edit-price">Price (KES)</Label>
-                <Input id="edit-price" v-model="editForm.price" type="number" placeholder="0.00" min="0" required />
+                <Input id="edit-price" v-model="editForm.price" type="number" placeholder="0.00" min="0" required/>
               </div>
               <div class="grid gap-2">
                 <Label for="edit-stock">Stock</Label>
-                <Input id="edit-stock" v-model="editForm.stock" type="number" placeholder="0" min="0" required />
+                <Input id="edit-stock" v-model="editForm.stock" type="number" placeholder="0" min="0" required/>
               </div>
             </div>
 
@@ -683,16 +697,18 @@ const closeDeleteDialog = () => {
                     :key="'existing-' + img.id"
                     class="group relative aspect-square overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700"
                 >
-                  <img :src="'/' + img.path" alt="Product" class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                  <div class="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/40" />
+                  <img :src="'/' + img.path" alt="Product"
+                       class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"/>
+                  <div class="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/40"/>
                   <button
                       type="button"
                       @click="removeExistingImage(img.id)"
                       class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
                   >
-                    <X class="h-3 w-3" />
+                    <X class="h-3 w-3"/>
                   </button>
-                  <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <div
+                      class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                     <p class="text-xs text-white truncate">Saved</p>
                   </div>
                 </div>
@@ -703,16 +719,18 @@ const closeDeleteDialog = () => {
                     :key="'new-' + index"
                     class="group relative aspect-square overflow-hidden rounded-lg border border-blue-300 dark:border-blue-800 ring-2 ring-blue-100 dark:ring-blue-900"
                 >
-                  <img :src="preview.url" alt="Preview" class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                  <div class="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/40" />
+                  <img :src="preview.url" alt="Preview"
+                       class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"/>
+                  <div class="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/40"/>
                   <button
                       type="button"
                       @click="removeEditImage(index)"
                       class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
                   >
-                    <X class="h-3 w-3" />
+                    <X class="h-3 w-3"/>
                   </button>
-                  <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <div
+                      class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                     <p class="text-xs text-white truncate">New</p>
                   </div>
                 </div>
@@ -741,8 +759,9 @@ const closeDeleteDialog = () => {
                     @change="editOnFileInput"
                 />
                 <div class="flex flex-col items-center justify-center gap-2 py-6 px-4">
-                  <div class="rounded-full bg-muted p-3 dark:bg-muted/50" :class="editIsDragging ? 'bg-primary/10' : ''">
-                    <Upload class="h-5 w-5 text-muted-foreground" :class="editIsDragging ? 'text-primary' : ''" />
+                  <div class="rounded-full bg-muted p-3 dark:bg-muted/50"
+                       :class="editIsDragging ? 'bg-primary/10' : ''">
+                    <Upload class="h-5 w-5 text-muted-foreground" :class="editIsDragging ? 'text-primary' : ''"/>
                   </div>
                   <div class="text-center">
                     <p class="text-sm font-medium text-muted-foreground">
@@ -755,7 +774,8 @@ const closeDeleteDialog = () => {
                 </div>
               </div>
 
-              <div v-else class="rounded-lg border border-dashed border-gray-200 dark:border-gray-600 bg-muted/20 py-3 px-4 text-center">
+              <div v-else
+                   class="rounded-lg border border-dashed border-gray-200 dark:border-gray-600 bg-muted/20 py-3 px-4 text-center">
                 <p class="text-xs text-muted-foreground">Maximum of {{ MAX_IMAGES }} images reached</p>
               </div>
             </div>
