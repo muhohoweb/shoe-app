@@ -69,7 +69,7 @@ const availableColors = [
   'light tan'
 ];
 
-const availableSizes = ['20', '21', '22', '28', '29', '30', '31', '36', '37', '38', '39', '40', '41', '42', '43', '44','45',46,'47']
+const availableSizes = Array.from({ length: 28 }, (_, i) => (i + 20).toString());
 
 const MAX_IMAGES = 3
 
