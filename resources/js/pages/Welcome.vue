@@ -313,6 +313,21 @@ const addToCart = () => {
   closeProductDetail()
 }
 
+const buyNow = () => {
+  if (!selectedProduct.value || !selectedSize.value || !selectedColor.value) return
+
+  // Clear cart and add only this product
+  cart.value = [{
+    product: selectedProduct.value,
+    size: selectedSize.value,
+    color: selectedColor.value,
+    quantity: detailQuantity.value,
+  }]
+
+  closeProductDetail()
+  openCheckout()
+}
+
 const removeFromCart = (index: number) => {
   cart.value.splice(index, 1)
 }
@@ -754,6 +769,15 @@ const getProductImage = (product: any) => {
               <ShoppingCart :size="18" />
               Add to Cart
               <span class="cart-total">{{ formatPrice((selectedProduct.price || 5) * detailQuantity) }}</span>
+            </button>
+
+            <button
+                class="buy-now-btn"
+                :disabled="!selectedSize || !selectedColor || (selectedProduct.stock || 10) === 0"
+                @click="buyNow"
+            >
+              <ArrowRight :size="18" />
+              Buy Now
             </button>
           </div>
         </div>
@@ -1905,7 +1929,7 @@ body {
 .product-actions {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   margin-top: 20px;
 }
 
@@ -1982,6 +2006,39 @@ body {
   background: #9ca3af;
   transform: none;
   box-shadow: none;
+}
+
+.buy-now-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 16px 24px;
+  background: white;
+  color: var(--charcoal);
+  border: 2px solid var(--charcoal);
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.buy-now-btn:hover:not(:disabled) {
+  background: var(--charcoal);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.buy-now-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: white;
+  border-color: #9ca3af;
+  color: #9ca3af;
+  transform: none;
 }
 
 .cart-total {
@@ -2641,7 +2698,7 @@ body {
     padding: 6px 12px;
   }
 
-  .add-to-cart-btn {
+  .add-to-cart-btn, .buy-now-btn {
     padding: 14px 20px;
     font-size: 14px;
   }
@@ -2706,7 +2763,7 @@ body {
     min-width: 32px;
   }
 
-  .add-to-cart-btn {
+  .add-to-cart-btn, .buy-now-btn {
     padding: 14px 20px;
     font-size: 14px;
   }
