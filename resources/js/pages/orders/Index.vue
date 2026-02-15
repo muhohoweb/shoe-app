@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { Edit, Trash2, Eye, Package, User, Phone, MapPin, PlusCircle, X } from 'lucide-vue-next';
+import { Edit, Trash2, Eye, Package, User, Phone, MapPin, PlusCircle, X, LayoutGrid, Table as TableIcon } from 'lucide-vue-next';
 import {
   Table,
   TableBody,
@@ -30,6 +30,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Card,
+  CardContent,
+} from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -103,6 +107,9 @@ const breadcrumbs: BreadcrumbItem[] = [
   { title: 'Orders' },
 ]
 
+// View toggle
+const viewMode = ref<'table' | 'kanban'>('table')
+
 const columns: { key: OrderStatus; label: string; color: string; bg: string; hoverBg: string }[] = [
   { key: 'pending', label: 'Pending', color: 'border-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/20', hoverBg: 'bg-yellow-100/50 dark:bg-yellow-900/40' },
   { key: 'processing', label: 'Processing', color: 'border-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20', hoverBg: 'bg-blue-100/50 dark:bg-blue-900/40' },
@@ -114,6 +121,13 @@ const paymentStatusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
   paid: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
   failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+}
+
+const statusColors: Record<OrderStatus, string> = {
+  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+  processing: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
 }
 
 // Drag state
@@ -381,153 +395,278 @@ const formatDate = (date: string) => {
   <Head title="Orders" />
 
   <AppLayout :breadcrumbs="breadcrumbs">
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
-      <div class="flex items-center justify-between">
-        <h2 class="text-xl font-semibold">Orders Board</h2>
-        <Button @click="openCreateDialog">
-          <PlusCircle class="h-4 w-4 mr-2" />
-          New Order
-        </Button>
+    <div class="flex h-full flex-1 flex-col gap-3 p-3 sm:gap-4 sm:p-4">
+      <!-- Header -->
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 class="text-lg font-semibold sm:text-xl">Orders</h2>
+        <div class="flex items-center gap-2">
+          <!-- View Toggle -->
+          <div class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 p-1">
+            <button
+                @click="viewMode = 'table'"
+                :class="[
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors sm:text-sm',
+                viewMode === 'table'
+                  ? 'bg-white dark:bg-gray-800 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+              ]"
+            >
+              <TableIcon class="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span class="hidden sm:inline">Table</span>
+            </button>
+            <button
+                @click="viewMode = 'kanban'"
+                :class="[
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors sm:text-sm',
+                viewMode === 'kanban'
+                  ? 'bg-white dark:bg-gray-800 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+              ]"
+            >
+              <LayoutGrid class="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span class="hidden sm:inline">Board</span>
+            </button>
+          </div>
+          <Button @click="openCreateDialog" size="sm" class="sm:size-default">
+            <PlusCircle class="h-4 w-4 sm:mr-2" />
+            <span class="hidden sm:inline">New Order</span>
+          </Button>
+        </div>
       </div>
 
-      <!-- Kanban Board -->
-      <div class="grid grid-cols-4 gap-4 flex-1">
-        <div
-            v-for="column in columns"
-            :key="column.key"
-            class="flex flex-col min-h-0"
-        >
-          <!-- Column Header -->
-          <div
-              class="rounded-t-lg border-t-4 px-3 py-2 flex-shrink-0 transition-colors duration-200"
-              :class="[column.color, column.bg]"
-          >
-            <div class="flex items-center justify-between">
-              <h3 class="font-semibold text-sm uppercase tracking-wide">
-                {{ column.label }}
-              </h3>
-              <span class="rounded-full bg-white dark:bg-gray-800 px-2 py-0.5 text-xs font-medium">
-                {{ getColumnCount(column.key) }}
-              </span>
-            </div>
-          </div>
+      <!-- Table View -->
+      <div v-if="viewMode === 'table'" class="flex-1 overflow-auto">
+        <!-- Mobile Cards -->
+        <div class="space-y-3 sm:hidden">
+          <Card v-for="order in orders?.data" :key="order.id" class="overflow-hidden">
+            <CardContent class="p-0">
+              <!-- Image Header -->
+              <div class="relative h-32 bg-gray-200 dark:bg-gray-700">
+                <img
+                    v-if="order.items?.[0]?.product?.images?.[0]?.path"
+                    :src="order.items[0].product.images[0].path"
+                    :alt="order.items[0].product?.name"
+                    class="w-full h-full object-cover"
+                />
+                <div v-else class="w-full h-full flex items-center justify-center">
+                  <Package class="h-10 w-10 text-gray-400" />
+                </div>
+                <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70"></div>
 
-          <!-- Column Body -->
-          <div
-              class="flex-1 rounded-b-lg border border-t-0 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-y-auto transition-all duration-200"
-              :class="{
-              'ring-2 ring-primary/50 ring-inset': isDragging,
-              [column.hoverBg]: isDragging,
-            }"
-          >
-            <draggable
-                v-model="kanbanData[column.key]"
-                group="orders"
-                item-key="id"
-                class="p-2 space-y-2 min-h-full"
-                ghost-class="kanban-ghost"
-                drag-class="kanban-drag"
-                chosen-class="kanban-chosen"
-                animation="200"
-                @start="handleDragStart"
-                @end="handleDragEnd"
-                @change="(evt: any) => handleDragChange(column.key, evt)"
-            >
-              <template #item="{ element: order }">
-                <div class="kanban-card bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing overflow-hidden">
+                <!-- Order Info on Image -->
+                <div class="absolute top-2 left-2 right-2 flex items-start justify-between">
+                  <span class="font-mono text-xs text-white font-semibold bg-black/30 backdrop-blur-sm px-2 py-1 rounded">
+                    #{{ order.uuid.slice(0, 8) }}
+                  </span>
+                  <span :class="['inline-flex rounded-full px-2 py-0.5 text-xs font-medium backdrop-blur-sm', paymentStatusColors[order.payment_status]]">
+                    {{ order.payment_status }}
+                  </span>
+                </div>
 
-                  <!-- Product Image Header -->
-                  <div class="relative h-32 bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                    <img
-                        v-if="order.items?.[0]?.product?.images?.[0]?.path"
-                        :src="order.items[0].product.images[0].path"
-                        :alt="order.items[0].product?.name"
-                        class="w-full h-full object-cover"
-                    />
-                    <div v-else class="w-full h-full flex items-center justify-center">
-                      <Package class="h-12 w-12 text-gray-400" />
-                    </div>
-                    <!-- Rest of the overlay code remains the same -->
-                    <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70"></div>
+                <div class="absolute bottom-2 left-2 right-2 flex items-end justify-between">
+                  <span class="font-bold text-white text-lg drop-shadow-lg">
+                    KES {{ Number(order.amount).toLocaleString() }}
+                  </span>
+                  <span :class="['inline-flex rounded-full px-2 py-0.5 text-xs font-medium backdrop-blur-sm', statusColors[order.status]]">
+                    {{ order.status }}
+                  </span>
+                </div>
+              </div>
 
-                    <!-- Order Number & Payment Status on Image -->
-                    <div class="absolute top-2 left-2 right-2 flex items-start justify-between">
-    <span class="font-mono text-xs text-white font-semibold bg-black/30 backdrop-blur-sm px-2 py-1 rounded">
-      #{{ order.uuid.slice(0, 8) }}
-    </span>
-                      <span
-                          class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium backdrop-blur-sm"
-                          :class="paymentStatusColors[order.payment_status]"
-                      >
-      {{ order.payment_status }}
-    </span>
-                    </div>
+              <!-- Card Body -->
+              <div class="p-3 space-y-2">
+                <div class="flex items-center gap-2 text-sm">
+                  <User class="h-3.5 w-3.5 text-gray-400" />
+                  <span class="font-medium truncate">{{ order.customer_name || 'N/A' }}</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                  <Phone class="h-3 w-3" />
+                  <span>{{ order.mpesa_number }}</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                  <MapPin class="h-3 w-3" />
+                  <span>{{ order.town }}</span>
+                </div>
 
-                    <!-- Amount on Image -->
-                    <div class="absolute bottom-2 left-2">
-    <span class="font-bold text-white text-lg drop-shadow-lg">
-      KES {{ Number(order.amount).toLocaleString() }}
-    </span>
-                    </div>
-
-                    <!-- Items Count Badge -->
-                    <div class="absolute bottom-2 right-2">
-    <span class="inline-flex items-center gap-1 text-xs text-white bg-black/40 backdrop-blur-sm px-2 py-1 rounded font-medium">
-      <Package class="h-3 w-3" />
-      {{ order.items?.length || 0 }}
-    </span>
-                    </div>
-                  </div>
-
-                  <!-- Card Content -->
-                  <div class="p-3">
-                    <!-- Customer Info -->
-                    <div class="space-y-1 mb-3">
-                      <div class="flex items-center gap-2 text-sm">
-                        <User class="h-3.5 w-3.5 text-gray-400" />
-                        <span class="font-medium truncate">{{ order.customer_name || 'N/A' }}</span>
-                      </div>
-                      <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                        <Phone class="h-3 w-3" />
-                        <span>{{ order.mpesa_number }}</span>
-                      </div>
-                      <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                        <MapPin class="h-3 w-3" />
-                        <span>{{ order.town }}</span>
-                      </div>
-                    </div>
-
-                    <!-- Card Footer -->
-                    <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-                      <span class="text-xs text-gray-400">{{ formatDate(order.created_at) }}</span>
-                      <div class="flex items-center gap-1">
-                        <button
-                            @click.stop="openViewDialog(order)"
-                            class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                            title="View"
-                        >
-                          <Eye class="h-4 w-4 text-gray-500" />
-                        </button>
-                        <button
-                            @click.stop="openEditDialog(order)"
-                            class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                            title="Edit"
-                        >
-                          <Edit class="h-4 w-4 text-blue-500" />
-                        </button>
-                        <button
-                            @click.stop="openDeleteDialog(order)"
-                            class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                            title="Delete"
-                        >
-                          <Trash2 class="h-4 w-4 text-red-500" />
-                        </button>
-                      </div>
-                    </div>
+                <!-- Actions -->
+                <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
+                  <span class="text-xs text-gray-400">{{ formatDate(order.created_at) }}</span>
+                  <div class="flex items-center gap-1">
+                    <button @click="openViewDialog(order)" class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                      <Eye class="h-4 w-4 text-gray-500" />
+                    </button>
+                    <button @click="openEditDialog(order)" class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                      <Edit class="h-4 w-4 text-blue-500" />
+                    </button>
+                    <button @click="openDeleteDialog(order)" class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                      <Trash2 class="h-4 w-4 text-red-500" />
+                    </button>
                   </div>
                 </div>
-              </template>
-            </draggable>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <!-- Desktop Table -->
+        <div class="hidden sm:block rounded-lg border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Order</TableHead>
+                <TableHead>Customer</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Town</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Payment</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead class="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="order in orders?.data" :key="order.id">
+                <TableCell class="font-mono text-xs">#{{ order.uuid.slice(0, 8) }}</TableCell>
+                <TableCell>{{ order.customer_name || 'N/A' }}</TableCell>
+                <TableCell class="text-xs">{{ order.mpesa_number }}</TableCell>
+                <TableCell>{{ order.town }}</TableCell>
+                <TableCell class="font-semibold">KES {{ Number(order.amount).toLocaleString() }}</TableCell>
+                <TableCell>
+                  <span :class="['inline-flex rounded-full px-2 py-1 text-xs font-medium', statusColors[order.status]]">
+                    {{ order.status }}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <span :class="['inline-flex rounded-full px-2 py-1 text-xs font-medium', paymentStatusColors[order.payment_status]]">
+                    {{ order.payment_status }}
+                  </span>
+                </TableCell>
+                <TableCell class="text-xs">{{ formatDate(order.created_at) }}</TableCell>
+                <TableCell class="text-right">
+                  <div class="flex items-center justify-end gap-1">
+                    <button @click="openViewDialog(order)" class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                      <Eye class="h-4 w-4 text-gray-500" />
+                    </button>
+                    <button @click="openEditDialog(order)" class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                      <Edit class="h-4 w-4 text-blue-500" />
+                    </button>
+                    <button @click="openDeleteDialog(order)" class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                      <Trash2 class="h-4 w-4 text-red-500" />
+                    </button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      <!-- Kanban View -->
+      <div v-else class="flex-1 overflow-x-auto">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-full pb-4">
+          <div v-for="column in columns" :key="column.key" class="flex flex-col min-h-[400px]">
+            <!-- Column Header -->
+            <div :class="['rounded-t-lg border-t-4 px-3 py-2 flex-shrink-0 transition-colors duration-200', column.color, column.bg]">
+              <div class="flex items-center justify-between">
+                <h3 class="font-semibold text-xs uppercase tracking-wide sm:text-sm">{{ column.label }}</h3>
+                <span class="rounded-full bg-white dark:bg-gray-800 px-2 py-0.5 text-xs font-medium">
+                  {{ getColumnCount(column.key) }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Column Body -->
+            <div :class="[
+              'flex-1 rounded-b-lg border border-t-0 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-y-auto transition-all duration-200',
+              { 'ring-2 ring-primary/50 ring-inset': isDragging, [column.hoverBg]: isDragging }
+            ]">
+              <draggable
+                  v-model="kanbanData[column.key]"
+                  group="orders"
+                  item-key="id"
+                  class="p-2 space-y-2 min-h-full"
+                  ghost-class="kanban-ghost"
+                  drag-class="kanban-drag"
+                  chosen-class="kanban-chosen"
+                  animation="200"
+                  @start="handleDragStart"
+                  @end="handleDragEnd"
+                  @change="(evt: any) => handleDragChange(column.key, evt)"
+              >
+                <template #item="{ element: order }">
+                  <div class="kanban-card bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing overflow-hidden">
+                    <!-- Product Image Header -->
+                    <div class="relative h-28 sm:h-32 bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                      <img
+                          v-if="order.items?.[0]?.product?.images?.[0]?.path"
+                          :src="order.items[0].product.images[0].path"
+                          :alt="order.items[0].product?.name"
+                          class="w-full h-full object-cover"
+                      />
+                      <div v-else class="w-full h-full flex items-center justify-center">
+                        <Package class="h-10 w-10 sm:h-12 sm:w-12 text-gray-400" />
+                      </div>
+                      <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70"></div>
+
+                      <div class="absolute top-2 left-2 right-2 flex items-start justify-between">
+                        <span class="font-mono text-xs text-white font-semibold bg-black/30 backdrop-blur-sm px-2 py-1 rounded">
+                          #{{ order.uuid.slice(0, 8) }}
+                        </span>
+                        <span :class="['inline-flex rounded-full px-2 py-0.5 text-xs font-medium backdrop-blur-sm', paymentStatusColors[order.payment_status]]">
+                          {{ order.payment_status }}
+                        </span>
+                      </div>
+
+                      <div class="absolute bottom-2 left-2">
+                        <span class="font-bold text-white text-base sm:text-lg drop-shadow-lg">
+                          KES {{ Number(order.amount).toLocaleString() }}
+                        </span>
+                      </div>
+
+                      <div class="absolute bottom-2 right-2">
+                        <span class="inline-flex items-center gap-1 text-xs text-white bg-black/40 backdrop-blur-sm px-2 py-1 rounded font-medium">
+                          <Package class="h-3 w-3" />
+                          {{ order.items?.length || 0 }}
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- Card Content -->
+                    <div class="p-3">
+                      <div class="space-y-1 mb-3">
+                        <div class="flex items-center gap-2 text-xs sm:text-sm">
+                          <User class="h-3 w-3 sm:h-3.5 sm:w-3.5 text-gray-400" />
+                          <span class="font-medium truncate">{{ order.customer_name || 'N/A' }}</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                          <Phone class="h-3 w-3" />
+                          <span>{{ order.mpesa_number }}</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                          <MapPin class="h-3 w-3" />
+                          <span>{{ order.town }}</span>
+                        </div>
+                      </div>
+
+                      <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
+                        <span class="text-xs text-gray-400">{{ formatDate(order.created_at) }}</span>
+                        <div class="flex items-center gap-1">
+                          <button @click.stop="openViewDialog(order)" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <Eye class="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-500" />
+                          </button>
+                          <button @click.stop="openEditDialog(order)" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <Edit class="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500" />
+                          </button>
+                          <button @click.stop="openDeleteDialog(order)" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <Trash2 class="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </draggable>
+            </div>
           </div>
         </div>
       </div>
@@ -535,14 +674,13 @@ const formatDate = (date: string) => {
 
     <!-- Create Dialog -->
     <Dialog v-model:open="isCreateDialogOpen">
-      <DialogContent class="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" @interact-outside="(e: Event) => e.preventDefault()">
+      <DialogContent class="w-[95vw] max-w-[700px] max-h-[90vh] overflow-y-auto" @interact-outside="(e: Event) => e.preventDefault()">
         <DialogHeader>
           <DialogTitle>Create New Order</DialogTitle>
         </DialogHeader>
         <form @submit.prevent="handleCreateSubmit">
           <div class="grid gap-4 py-4">
-            <!-- Customer Details -->
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div class="grid gap-2">
                 <Label>Customer Name</Label>
                 <Input v-model="createForm.customer_name" placeholder="John Doe" />
@@ -553,7 +691,7 @@ const formatDate = (date: string) => {
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div class="grid gap-2">
                 <Label>Town *</Label>
                 <Input v-model="createForm.town" placeholder="Nairobi" required />
@@ -569,13 +707,11 @@ const formatDate = (date: string) => {
               <Input v-model="createForm.description" placeholder="Order details" required />
             </div>
 
-            <!-- Items Section -->
             <div class="border-t pt-4">
               <Label class="text-base font-semibold mb-3 block">Order Items</Label>
 
-              <!-- Add Item Form -->
               <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg space-y-3 mb-3">
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div class="grid gap-2">
                     <Label>Product *</Label>
                     <Select :model-value="currentItem.product_id?.toString()" @update:model-value="onProductSelect">
@@ -593,7 +729,7 @@ const formatDate = (date: string) => {
                   </div>
                 </div>
 
-                <div class="grid grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div class="grid gap-2">
                     <Label>Price *</Label>
                     <Input v-model.number="currentItem.price" type="number" step="0.01" min="0" />
@@ -603,9 +739,7 @@ const formatDate = (date: string) => {
                     <Select v-model="currentItem.size">
                       <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem v-for="size in availableSizes" :key="size" :value="size">
-                          {{ size }}
-                        </SelectItem>
+                        <SelectItem v-for="size in availableSizes" :key="size" :value="size">{{ size }}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -614,20 +748,15 @@ const formatDate = (date: string) => {
                     <Select v-model="currentItem.color">
                       <SelectTrigger><SelectValue placeholder="Select color" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem v-for="color in availableColors" :key="color" :value="color">
-                          {{ color }}
-                        </SelectItem>
+                        <SelectItem v-for="color in availableColors" :key="color" :value="color">{{ color }}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
-                <Button type="button" @click="addItem" variant="outline" class="w-full">
-                  Add Item
-                </Button>
+                <Button type="button" @click="addItem" variant="outline" class="w-full">Add Item</Button>
               </div>
 
-              <!-- Items List -->
               <div v-if="createForm.items.length > 0" class="space-y-2">
                 <div v-for="(item, index) in createForm.items" :key="index" class="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded border">
                   <div class="flex-1">
@@ -648,14 +777,13 @@ const formatDate = (date: string) => {
               </div>
             </div>
 
-            <!-- Order Summary -->
             <div class="border-t pt-4">
               <div class="flex justify-between items-center mb-4">
                 <span class="font-semibold">Total Amount:</span>
                 <span class="text-xl font-bold">KES {{ createForm.amount.toLocaleString() }}</span>
               </div>
 
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="grid gap-2">
                   <Label>Payment Status</Label>
                   <Select v-model="createForm.payment_status">
@@ -697,16 +825,14 @@ const formatDate = (date: string) => {
 
     <!-- View Dialog -->
     <Dialog v-model:open="isViewDialogOpen">
-      <DialogContent class="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent class="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Order Details</DialogTitle>
-          <DialogDescription v-if="viewingOrder">
-            Order #{{ viewingOrder.uuid.slice(0, 8) }}
-          </DialogDescription>
+          <DialogDescription v-if="viewingOrder">#{{ viewingOrder.uuid.slice(0, 8) }}</DialogDescription>
         </DialogHeader>
 
         <div v-if="viewingOrder" class="grid gap-4 py-4">
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label class="text-muted-foreground">Customer</Label>
               <p class="font-medium">{{ viewingOrder.customer_name || 'N/A' }}</p>
@@ -716,7 +842,7 @@ const formatDate = (date: string) => {
               <p class="font-medium">{{ viewingOrder.mpesa_number }}</p>
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label class="text-muted-foreground">Amount</Label>
               <p class="font-medium">KES {{ Number(viewingOrder.amount).toLocaleString() }}</p>
@@ -726,7 +852,7 @@ const formatDate = (date: string) => {
               <p class="font-medium font-mono">{{ viewingOrder.mpesa_code || 'N/A' }}</p>
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label class="text-muted-foreground">Town</Label>
               <p class="font-medium">{{ viewingOrder.town }}</p>
@@ -747,17 +873,23 @@ const formatDate = (date: string) => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Product</TableHead>
-                    <TableHead>Size</TableHead>
-                    <TableHead>Color</TableHead>
+                    <TableHead class="hidden sm:table-cell">Size</TableHead>
+                    <TableHead class="hidden sm:table-cell">Color</TableHead>
                     <TableHead>Qty</TableHead>
                     <TableHead>Price</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   <TableRow v-for="item in viewingOrder.items" :key="item.id">
-                    <TableCell>{{ item.product?.name || 'N/A' }}</TableCell>
-                    <TableCell>{{ item.size || '-' }}</TableCell>
-                    <TableCell>{{ item.color || '-' }}</TableCell>
+                    <TableCell>
+                      <div>{{ item.product?.name || 'N/A' }}</div>
+                      <div class="text-xs text-gray-500 sm:hidden">
+                        <span v-if="item.size">{{ item.size }}</span>
+                        <span v-if="item.color">{{ item.size ? ' • ' : '' }}{{ item.color }}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell class="hidden sm:table-cell">{{ item.size || '-' }}</TableCell>
+                    <TableCell class="hidden sm:table-cell">{{ item.color || '-' }}</TableCell>
                     <TableCell>{{ item.quantity }}</TableCell>
                     <TableCell>KES {{ Number(item.price).toLocaleString() }}</TableCell>
                   </TableRow>
@@ -774,12 +906,10 @@ const formatDate = (date: string) => {
 
     <!-- Edit Dialog -->
     <Dialog v-model:open="isEditDialogOpen">
-      <DialogContent class="sm:max-w-[450px]" @interact-outside="(e: Event) => e.preventDefault()">
+      <DialogContent class="w-[95vw] max-w-[450px]" @interact-outside="(e: Event) => e.preventDefault()">
         <DialogHeader>
           <DialogTitle>Update Order</DialogTitle>
-          <DialogDescription v-if="editingOrder">
-            Order #{{ editingOrder.uuid.slice(0, 8) }}
-          </DialogDescription>
+          <DialogDescription v-if="editingOrder">#{{ editingOrder.uuid.slice(0, 8) }}</DialogDescription>
         </DialogHeader>
         <form @submit.prevent="handleEditSubmit">
           <div class="grid gap-4 py-4">
@@ -821,7 +951,7 @@ const formatDate = (date: string) => {
 
     <!-- Delete Dialog -->
     <AlertDialog v-model:open="isDeleteDialogOpen">
-      <AlertDialogContent>
+      <AlertDialogContent class="w-[95vw] max-w-[450px]">
         <AlertDialogHeader>
           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
           <AlertDialogDescription>
@@ -832,9 +962,7 @@ const formatDate = (date: string) => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel @click="closeDeleteDialog">Cancel</AlertDialogCancel>
-          <AlertDialogAction @click="handleDeleteConfirm" class="bg-red-600 hover:bg-red-700">
-            Delete
-          </AlertDialogAction>
+          <AlertDialogAction @click="handleDeleteConfirm" class="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -842,7 +970,6 @@ const formatDate = (date: string) => {
 </template>
 
 <style>
-/* Ghost element - placeholder where item will be dropped */
 .kanban-ghost {
   opacity: 0.4;
   background: hsl(var(--primary) / 0.1) !important;
@@ -850,7 +977,6 @@ const formatDate = (date: string) => {
   border-radius: 0.5rem;
 }
 
-/* The element being dragged */
 .kanban-drag {
   opacity: 1 !important;
   transform: rotate(3deg) scale(1.02);
@@ -858,17 +984,14 @@ const formatDate = (date: string) => {
   z-index: 9999;
 }
 
-/* The chosen element before dragging starts */
 .kanban-chosen {
   box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
 }
 
-/* Smooth transitions for cards moving out of the way */
 .kanban-card {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Sortable animation for items moving */
 .sortable-ghost {
   opacity: 0;
 }
