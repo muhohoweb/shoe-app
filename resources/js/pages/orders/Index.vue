@@ -679,6 +679,76 @@ const formatDate = (date: string) => {
           <DialogTitle>Create New Order</DialogTitle>
         </DialogHeader>
         <form @submit.prevent="handleCreateSubmit">
+          <div class="border-t pt-4">
+            <Label class="text-base font-semibold mb-3 block">Order Items</Label>
+
+            <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg space-y-3 mb-3">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="grid gap-2">
+                  <Label>Product *</Label>
+                  <Select :model-value="currentItem.product_id?.toString()" @update:model-value="onProductSelect">
+                    <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem v-for="product in products" :key="product.id" :value="product.id.toString()">
+                        {{ product.name }} - KES {{ product.price }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div class="grid gap-2">
+                  <Label>Quantity *</Label>
+                  <Input v-model.number="currentItem.quantity" type="number" min="1" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="grid gap-2">
+                  <Label>Price *</Label>
+                  <Input v-model.number="currentItem.price" type="number" step="0.01" min="0" />
+                </div>
+                <div class="grid gap-2" v-if="availableSizes.length > 0">
+                  <Label>Size</Label>
+                  <Select v-model="currentItem.size">
+                    <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem v-for="size in availableSizes" :key="size" :value="size">{{ size }}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div class="grid gap-2" v-if="availableColors.length > 0">
+                  <Label>Color</Label>
+                  <Select v-model="currentItem.color">
+                    <SelectTrigger><SelectValue placeholder="Select color" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem v-for="color in availableColors" :key="color" :value="color">{{ color }}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <Button type="button" @click="addItem" variant="outline" class="w-full">Add Item</Button>
+            </div>
+
+            <div v-if="createForm.items.length > 0" class="space-y-2">
+              <div v-for="(item, index) in createForm.items" :key="index" class="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded border">
+                <div class="flex-1">
+                  <p class="font-medium text-sm">{{ getProductName(item.product_id) }}</p>
+                  <p class="text-xs text-gray-500">
+                    Qty: {{ item.quantity }} × KES {{ item.price }}
+                    <span v-if="item.size"> • Size: {{ item.size }}</span>
+                    <span v-if="item.color"> • Color: {{ item.color }}</span>
+                  </p>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="font-semibold text-sm">KES {{ (item.quantity * item.price).toLocaleString() }}</span>
+                  <button type="button" @click="removeItem(index)" class="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                    <X class="h-4 w-4 text-red-500" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="grid gap-4 py-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div class="grid gap-2">
@@ -707,75 +777,7 @@ const formatDate = (date: string) => {
               <Input v-model="createForm.description" placeholder="Order details" required />
             </div>
 
-            <div class="border-t pt-4">
-              <Label class="text-base font-semibold mb-3 block">Order Items</Label>
 
-              <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg space-y-3 mb-3">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div class="grid gap-2">
-                    <Label>Product *</Label>
-                    <Select :model-value="currentItem.product_id?.toString()" @update:model-value="onProductSelect">
-                      <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem v-for="product in products" :key="product.id" :value="product.id.toString()">
-                          {{ product.name }} - KES {{ product.price }}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div class="grid gap-2">
-                    <Label>Quantity *</Label>
-                    <Input v-model.number="currentItem.quantity" type="number" min="1" />
-                  </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div class="grid gap-2">
-                    <Label>Price *</Label>
-                    <Input v-model.number="currentItem.price" type="number" step="0.01" min="0" />
-                  </div>
-                  <div class="grid gap-2" v-if="availableSizes.length > 0">
-                    <Label>Size</Label>
-                    <Select v-model="currentItem.size">
-                      <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem v-for="size in availableSizes" :key="size" :value="size">{{ size }}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div class="grid gap-2" v-if="availableColors.length > 0">
-                    <Label>Color</Label>
-                    <Select v-model="currentItem.color">
-                      <SelectTrigger><SelectValue placeholder="Select color" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem v-for="color in availableColors" :key="color" :value="color">{{ color }}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <Button type="button" @click="addItem" variant="outline" class="w-full">Add Item</Button>
-              </div>
-
-              <div v-if="createForm.items.length > 0" class="space-y-2">
-                <div v-for="(item, index) in createForm.items" :key="index" class="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded border">
-                  <div class="flex-1">
-                    <p class="font-medium text-sm">{{ getProductName(item.product_id) }}</p>
-                    <p class="text-xs text-gray-500">
-                      Qty: {{ item.quantity }} × KES {{ item.price }}
-                      <span v-if="item.size"> • Size: {{ item.size }}</span>
-                      <span v-if="item.color"> • Color: {{ item.color }}</span>
-                    </p>
-                  </div>
-                  <div class="flex items-center gap-3">
-                    <span class="font-semibold text-sm">KES {{ (item.quantity * item.price).toLocaleString() }}</span>
-                    <button type="button" @click="removeItem(index)" class="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
-                      <X class="h-4 w-4 text-red-500" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
 
             <div class="border-t pt-4">
               <div class="flex justify-between items-center mb-4">

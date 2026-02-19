@@ -39,6 +39,20 @@ class WhatsAppController extends Controller
         return response('OK', 200);
     }
 
+    public function sendWhatsAppMessage(Request $request): bool {
+        $request->validate([
+            'phone' => 'required|string',
+            'message' => 'required|string',
+        ]);
+
+        $response = Http::post(config('services.whats_app_service.key'), [
+            'phone' => $request->phone,
+            'message' => $request->message,
+        ]);
+
+        return $response->successful();
+    }
+
     public function sendDispatchNotification(Request $request)
     {
         $response = Http::withToken(env('WHATSAPP_ACCESS_TOKEN'))

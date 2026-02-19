@@ -57,7 +57,7 @@ class OrderController extends Controller
             'items.*.color' => 'nullable|string',
         ]);
 
-        $order = Order::create([
+        $order = Order::query()->create([
             'uuid' => Str::uuid(),
             'customer_name' => $validated['customer_name'],
             'mpesa_number' => $validated['mpesa_number'],
@@ -94,29 +94,11 @@ class OrderController extends Controller
             ]);
 
             try {
-                $response = Http::withToken(env('WHATSAPP_ACCESS_TOKEN'))
-                    ->post('https://graph.facebook.com/v21.0/' . env('WHATSAPP_PHONE_NUMBER_ID') . '/messages', [
-                        'messaging_product' => 'whatsapp',
-                        'to' => $order->mpesa_number,
-                        'type' => 'template',
-                        'template' => [
-                            'name' => 'dispatch',
-                            'language' => ['code' => 'en'],
-                            'components' => [
-                                [
-                                    'type' => 'body',
-                                    'parameters' => [
-                                        ['type' => 'text', 'text' => $order->customer_name ?? 'Customer'],
-                                        ['type' => 'text', 'text' => $order->uuid],
-                                        ['type' => 'text', 'text' => $order->town],
-                                        ['type' => 'text', 'text' => now()->addDays(2)->format('M d, Y')],
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]);
-
-                Log::info('WhatsApp response', $response->json());
+                $whatsApp = new WhatsAppController();
+                $whatsApp->sendWhatsAppMessage(new Request([
+                    'phone' => $order->mpesa_number,
+                    'message' => "Hi {$order->customer_name}, your order {$order->uuid} has been dispatched to {$order->town} and is expected by " . now()->addDays(2)->format('M d, Y') . ".",
+                ]));
             } catch (\Exception $e) {
                 Log::error('WhatsApp error', ['error' => $e->getMessage()]);
             }
