@@ -56,11 +56,14 @@ class ShopController extends Controller
             $total += $product->price * $item['quantity'];
         }
 
+        $trackingNumber = strtoupper(Str::random(6));
+
         // Create order
         $order = Order::query()->create([
             'uuid' => (string) Str::uuid(),
             'customer_name' => $validated['customer_name'],
             'mpesa_number' => $validated['mpesa_number'],
+            'tracking_number' => $trackingNumber,
             'amount' => $total,
             'town' => $validated['town'],
             'description' => $validated['description'],
@@ -100,7 +103,7 @@ class ShopController extends Controller
         $phone = preg_replace('/^0/', '254', $phoneNumber);
         $phone = preg_replace('/^\+/', '', $phone);
 
-        $accountReference = 'ORD-' . substr($order->uuid, 0, 8);
+        $accountReference = $order->tracking_number;
 
         try {
             $response = Mpesa::stkpush(

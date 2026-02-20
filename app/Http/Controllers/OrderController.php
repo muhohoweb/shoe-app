@@ -64,7 +64,7 @@ class OrderController extends Controller
             'mpesa_code' => $validated['mpesa_code'],
             'amount' => $validated['amount'],
             'payment_status' => $validated['payment_status'],
-            'tracking_number' => $validated['tracking_number'],
+            'tracking_number' => strtoupper(Str::random(6)),
             'town' => $validated['town'],
             'description' => $validated['description'],
             'status' => $validated['status'],
@@ -97,7 +97,7 @@ class OrderController extends Controller
                 $whatsApp = new WhatsAppController();
                 $whatsApp->sendWhatsAppMessage(new Request([
                     'phone' => preg_replace('/^0/', '254', $order->mpesa_number),
-                    'message' => "Hi {$order->customer_name}, your order {$order->uuid} has been dispatched to {$order->town} and is expected by " . now()->addDays(2)->format('M d, Y') . ".",
+                    'message' => "Hi {$order->customer_name}, your order {$order->tracking_number} has been dispatched to {$order->town} and is expected by " . now()->addDays(2)->format('M d, Y') . ".",
                 ]));
             } catch (\Exception $e) {
                 Log::error('WhatsApp error', ['error' => $e->getMessage()]);
