@@ -39,7 +39,8 @@ class WhatsAppController extends Controller
         return response('OK', 200);
     }
 
-    public function sendWhatsAppMessage(Request $request): bool {
+    /** @deprecated Use sendWhatsAppMessage() with FlareSend instead */
+    public function sendOldWhatsAppMessage(Request $request): bool {
         $request->validate([
             'phone' => 'required|string',
             'message' => 'required|string',
@@ -48,6 +49,25 @@ class WhatsAppController extends Controller
         $response = Http::post(config('services.whats_app_service.key'), [
             'phone' => $request->phone,
             'message' => $request->message,
+        ]);
+
+        return $response->successful();
+    }
+
+    public function sendWhatsAppMessage(Request $request): bool
+    {
+        $request->validate([
+            'phone' => 'required|string',
+            'message' => 'required|string',
+        ]);
+
+        $response = Http::withHeaders([
+            'Authorization' => config('services.flaresend.key'),
+            'Content-Type' => 'application/json',
+        ])->post('https://api.flaresend.com/send-message', [
+            'recipients' => [$request->phone],
+            'type' => 'text',
+            'text' => $request->message,
         ]);
 
         return $response->successful();
