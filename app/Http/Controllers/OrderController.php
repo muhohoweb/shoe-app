@@ -96,7 +96,7 @@ class OrderController extends Controller
             try {
                 $whatsApp = new WhatsAppController();
                 $whatsApp->sendWhatsAppMessage(new Request([
-                    'phone' => $order->mpesa_number,
+                    'phone' => preg_replace('/^0/', '254', $order->mpesa_number),
                     'message' => "Hi {$order->customer_name}, your order {$order->uuid} has been dispatched to {$order->town} and is expected by " . now()->addDays(2)->format('M d, Y') . ".",
                 ]));
             } catch (\Exception $e) {
