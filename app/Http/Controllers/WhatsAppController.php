@@ -62,12 +62,17 @@ class WhatsAppController extends Controller
         ]);
 
         $response = Http::withHeaders([
-            'Authorization' => config('services.flaresend.key'),
+            'Authorization' => 'Bearer ' . config('services.flaresend.key'),
             'Content-Type' => 'application/json',
         ])->post('https://api.flaresend.com/send-message', [
             'recipients' => [$request->phone],
             'type' => 'text',
             'text' => $request->message,
+        ]);
+
+        Log::info('FlareSend response', [
+            'status' => $response->status(),
+            'body' => $response->json(),
         ]);
 
         return $response->successful();
