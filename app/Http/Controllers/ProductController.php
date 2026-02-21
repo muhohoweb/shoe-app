@@ -5,44 +5,39 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
-use Intervention\Image\Laravel\Facades\Image;
+use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver;
 
 class ProductController extends Controller
 {
-    // Simple dynamic upload path
-    private function getUploadPath()
+    private function getUploadPath(): string
     {
-        // Based on your server output, this will work for ALL your subdomains
         return $_SERVER['DOCUMENT_ROOT'] . '/uploads';
     }
 
     public function index()
     {
         return Inertia::render('products/Index', [
-            'products' => Product::with('category', 'images')->latest()->paginate(10),
+            'products'   => Product::with('category', 'images')->latest()->paginate(10),
             'categories' => Category::all(),
         ]);
     }
 
     public function store(Request $request)
     {
-        Log::info('Store called', $request->all());
         $validated = $request->validate([
             'category_id' => 'required|exists:categories,id',
-            'name' => 'required|string|max:255',
+            'name'        => 'required|string|max:255',
             'description' => 'required|string',
-            'price' => 'required|numeric|min:0',
-            'stock' => 'required|integer|min:0',
-            'colors' => 'required|array',
-            'sizes' => 'required|array',
-            'images' => 'nullable|array|max:3',
-            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:15360',
+            'price'       => 'required|numeric|min:0',
+            'stock'       => 'required|integer|min:0',
+            'colors'      => 'required|array',
+            'sizes'       => 'required|array',
+            'images'      => 'nullable|array|max:3',
+            'images.*'    => 'nullable|image|mimes:jpg,jpeg,png,webp|max:15360',
         ]);
-
-        Log::info('Validated', $validated);
 
         $slug = Str::slug($validated['name']);
         $originalSlug = $slug;
@@ -53,14 +48,14 @@ class ProductController extends Controller
 
         $product = Product::query()->create([
             'category_id' => $validated['category_id'],
-            'name' => $validated['name'],
+            'name'        => $validated['name'],
             'description' => $validated['description'],
-            'price' => $validated['price'],
-            'stock' => $validated['stock'],
-            'colors' => $validated['colors'],
-            'sizes' => $validated['sizes'],
-            'slug' => $slug,
-            'sku' => 'SKU-' . strtoupper(Str::random(8)),
+            'price'       => $validated['price'],
+            'stock'       => $validated['stock'],
+            'colors'      => $validated['colors'],
+            'sizes'       => $validated['sizes'],
+            'slug'        => $slug,
+            'sku'         => 'SKU-' . strtoupper(Str::random(8)),
         ]);
 
         $this->uploadImages($product, $request->file('images') ?? []);
@@ -73,16 +68,16 @@ class ProductController extends Controller
         $product = Product::query()->findOrFail($id);
 
         $validated = $request->validate([
-            'category_id' => 'required|exists:categories,id',
-            'name' => 'required|string|max:255',
-            'description' => 'required|string',
-            'price' => 'required|numeric|min:0',
-            'stock' => 'required|integer|min:0',
-            'colors' => 'required|array',
-            'sizes' => 'required|array',
-            'images' => 'nullable|array|max:3',
-            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:15360',
-            'removed_image_ids' => 'nullable|array',
+            'category_id'         => 'required|exists:categories,id',
+            'name'                => 'required|string|max:255',
+            'description'         => 'required|string',
+            'price'               => 'required|numeric|min:0',
+            'stock'               => 'required|integer|min:0',
+            'colors'              => 'required|array',
+            'sizes'               => 'required|array',
+            'images'              => 'nullable|array|max:3',
+            'images.*'            => 'nullable|image|mimes:jpg,jpeg,png,webp|max:15360',
+            'removed_image_ids'   => 'nullable|array',
             'removed_image_ids.*' => 'nullable|integer',
         ]);
 
@@ -98,29 +93,25 @@ class ProductController extends Controller
 
         $product->update([
             'category_id' => $validated['category_id'],
-            'name' => $validated['name'],
+            'name'        => $validated['name'],
             'description' => $validated['description'],
-            'price' => $validated['price'],
-            'stock' => $validated['stock'],
-            'colors' => $validated['colors'],
-            'sizes' => $validated['sizes'],
-            'slug' => $validated['slug'] ?? $product->slug,
+            'price'       => $validated['price'],
+            'stock'       => $validated['stock'],
+            'colors'      => $validated['colors'],
+            'sizes'       => $validated['sizes'],
+            'slug'        => $validated['slug'] ?? $product->slug,
         ]);
 
-        // Delete removed images
         if (!empty($validated['removed_image_ids'])) {
-            $uploadPath = $this->getUploadPath();
+            $uploadPath    = $this->getUploadPath();
             $removedImages = $product->images()->whereIn('id', $validated['removed_image_ids'])->get();
             foreach ($removedImages as $image) {
                 $imagePath = $uploadPath . '/' . basename($image->path);
-                if (file_exists($imagePath)) {
-                    unlink($imagePath);
-                }
+                if (file_exists($imagePath)) unlink($imagePath);
             }
             $product->images()->whereIn('id', $validated['removed_image_ids'])->delete();
         }
 
-        // Upload new images
         $this->uploadImages($product, $request->file('images') ?? []);
 
         return redirect()->route('products.index');
@@ -128,15 +119,12 @@ class ProductController extends Controller
 
     public function destroy(string $id)
     {
-        $product = Product::query()->findOrFail($id);
+        $product    = Product::query()->findOrFail($id);
         $uploadPath = $this->getUploadPath();
 
-        // Delete images
         foreach ($product->images as $image) {
             $imagePath = $uploadPath . '/' . basename($image->path);
-            if (file_exists($imagePath)) {
-                unlink($imagePath);
-            }
+            if (file_exists($imagePath)) unlink($imagePath);
         }
 
         $product->delete();
@@ -152,15 +140,16 @@ class ProductController extends Controller
             mkdir($uploadPath, 0755, true);
         }
 
+        $manager = new ImageManager(new Driver());
+
         foreach ($images as $image) {
             if (!$image) continue;
 
             $filename = time() . '_' . Str::random(20) . '.webp';
 
-            // Resize and compress
-            Image::read($image)
-                ->scaleDown(width: 1200)        // max width 1200px, keeps aspect ratio
-                ->toWebp(quality: 80)           // convert to webp at 80% quality
+            $manager->read($image->getRealPath())
+                ->scaleDown(width: 1200)
+                ->toWebp(quality: 80)
                 ->save($uploadPath . '/' . $filename);
 
             $product->images()->create([
