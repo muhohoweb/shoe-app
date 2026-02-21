@@ -148,8 +148,8 @@ class ProductController extends Controller
             $filename = time() . '_' . Str::random(20) . '.webp';
 
             $manager->read($image->getRealPath())
-                ->scaleDown(width: 1200)
-                ->toWebp(quality: 80)
+                ->scaleDown(width: 600)
+                ->toWebp(quality: 60)
                 ->save($uploadPath . '/' . $filename);
 
             $product->images()->create([
