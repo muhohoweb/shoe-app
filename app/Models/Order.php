@@ -14,6 +14,7 @@ class Order extends Model
         'customer_name',
         'mpesa_number',
         'mpesa_code',
+        'delivery_fee',
         'amount',
         'payment_status',
         'tracking_number',

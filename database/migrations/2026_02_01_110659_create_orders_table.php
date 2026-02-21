@@ -19,7 +19,8 @@ return new class extends Migration
 
             // Payment & M-Pesa
             $table->string('mpesa_number');
-            $table->string('mpesa_code')->nullable(); // e.g. MPESA transaction ID
+            $table->string('mpesa_code')->nullable();
+            $table->decimal('delivery_fee', 10, 2)->default(0);
             $table->decimal('amount', 10, 2);
             $table->enum('payment_status', ['pending', 'paid', 'failed'])->default('pending');
 
