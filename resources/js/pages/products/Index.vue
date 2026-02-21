@@ -150,7 +150,7 @@ const removeAddImage = (index: number) => {
 
 const handleAddSubmit = () => {
   addForm.post('/products', {
-    forceFormData: true,  // 👈 add this
+    forceFormData: true,
     preserveScroll: true,
     onSuccess: () => {
       toast.success('Product Added', {
@@ -258,22 +258,24 @@ const removeExistingImage = (id: number) => {
 }
 
 const handleEditSubmit = () => {
-  editForm.post(`/products/${editForm.id}`, {  // 👈 change put to post
-    forceFormData: true,                        // 👈 add this
-    preserveScroll: true,
-    onSuccess: () => {
-      toast.success('Product Updated', {
-        description: `${editForm.name} has been updated successfully.`,
+  editForm
+      .transform((data) => ({ ...data, _method: 'PUT' }))
+      .post(`/products/${editForm.id}`, {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => {
+          toast.success('Product Updated', {
+            description: `${editForm.name} has been updated successfully.`,
+          })
+          isEditDialogOpen.value = false
+          editingProduct.value = null
+        },
+        onError: () => {
+          toast.error('Validation Error', {
+            description: 'Please check the form for errors.',
+          })
+        },
       })
-      isEditDialogOpen.value = false
-      editingProduct.value = null
-    },
-    onError: () => {
-      toast.error('Validation Error', {
-        description: 'Please check the form for errors.',
-      })
-    },
-  })
 }
 
 // ─── Delete Modal ───────────────────────────────────────────────
@@ -488,6 +490,7 @@ const closeDeleteDialog = () => {
                   {{ color }}
                 </button>
               </div>
+              <p v-if="addForm.errors.colors" class="text-xs text-red-500">{{ addForm.errors.colors }}</p>
             </div>
 
             <!-- Sizes -->
@@ -507,6 +510,7 @@ const closeDeleteDialog = () => {
                   {{ size }}
                 </button>
               </div>
+              <p v-if="addForm.errors.sizes" class="text-xs text-red-500">{{ addForm.errors.sizes }}</p>
             </div>
 
             <!-- Images Upload -->
@@ -546,7 +550,7 @@ const closeDeleteDialog = () => {
                   @drop="addOnDrop"
                   @dragover.prevent="addIsDragging = true"
                   @dragleave="addIsDragging = false"
-                  @click="$refs.addFileInput.click()"
+                  @click="($refs.addFileInput as HTMLInputElement).click()"
                   class="relative rounded-lg border-2 border-dashed transition-all duration-200 cursor-pointer"
                   :class="[
                   addIsDragging
@@ -585,8 +589,16 @@ const closeDeleteDialog = () => {
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" @click="closeAddDialog">Cancel</Button>
-            <Button type="submit">Save Product</Button>
+            <Button type="button" variant="outline" @click="closeAddDialog" :disabled="addForm.processing">
+              Cancel
+            </Button>
+            <Button type="submit" :disabled="addForm.processing">
+              <svg v-if="addForm.processing" class="mr-2 h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+              {{ addForm.processing ? 'Saving...' : 'Save Product' }}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -663,6 +675,7 @@ const closeDeleteDialog = () => {
                   {{ color }}
                 </button>
               </div>
+              <p v-if="editForm.errors.colors" class="text-xs text-red-500">{{ editForm.errors.colors }}</p>
             </div>
 
             <!-- Sizes -->
@@ -682,6 +695,7 @@ const closeDeleteDialog = () => {
                   {{ size }}
                 </button>
               </div>
+              <p v-if="editForm.errors.sizes" class="text-xs text-red-500">{{ editForm.errors.sizes }}</p>
             </div>
 
             <!-- Images Upload -->
@@ -744,7 +758,7 @@ const closeDeleteDialog = () => {
                   @drop="editOnDrop"
                   @dragover.prevent="editIsDragging = true"
                   @dragleave="editIsDragging = false"
-                  @click="$refs.editFileInput.click()"
+                  @click="($refs.editFileInput as HTMLInputElement).click()"
                   class="relative rounded-lg border-2 border-dashed transition-all duration-200 cursor-pointer"
                   :class="[
                   editIsDragging
@@ -784,8 +798,16 @@ const closeDeleteDialog = () => {
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" @click="closeEditDialog">Cancel</Button>
-            <Button type="submit">Save Changes</Button>
+            <Button type="button" variant="outline" @click="closeEditDialog" :disabled="editForm.processing">
+              Cancel
+            </Button>
+            <Button type="submit" :disabled="editForm.processing">
+              <svg v-if="editForm.processing" class="mr-2 h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+              {{ editForm.processing ? 'Saving...' : 'Save Changes' }}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
