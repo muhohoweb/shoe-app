@@ -142,8 +142,9 @@ const clearLocation = () => {
   locationSearch.value = ''
 }
 
+
 const orderTotal = computed(() =>
-    cartItemsTotal.value + (selectedLocation.value?.delivery_fee ?? 0)
+    cartItemsTotal.value + Number(selectedLocation.value?.delivery_fee ?? 0)
 )
 
 // ─── Filtered Products ──────────────────────────────────────────────────────
@@ -340,7 +341,7 @@ const heroOverlayStyle = computed(() => ({
 }))
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const formatPrice = (price: number) => `KES ${Number(price).toLocaleString()}`
+const formatPrice = (price: any) => `KES ${Number(price).toLocaleString()}`
 
 const getProductImage = (product: any) => {
   if (product.images && product.images.length > 0) {
