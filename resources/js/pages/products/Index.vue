@@ -150,6 +150,7 @@ const removeAddImage = (index: number) => {
 
 const handleAddSubmit = () => {
   addForm.post('/products', {
+    forceFormData: true,  // 👈 add this
     preserveScroll: true,
     onSuccess: () => {
       toast.success('Product Added', {
@@ -257,7 +258,8 @@ const removeExistingImage = (id: number) => {
 }
 
 const handleEditSubmit = () => {
-  editForm.put(`/products/${editForm.id}`, {
+  editForm.post(`/products/${editForm.id}`, {  // 👈 change put to post
+    forceFormData: true,                        // 👈 add this
     preserveScroll: true,
     onSuccess: () => {
       toast.success('Product Updated', {

@@ -32,6 +32,8 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/products/{id}', [ProductController::class, 'update'])->name('products.update');
     Route::delete('/products/{id}', [ProductController::class, 'destroy'])->name('products.destroy');
 
+    Route::post('/products/{id}/update', [ProductController::class, 'update'])->name('products.update'); // 👈 add this
+
 
     Route::resource('orders', OrderController::class)->only(['index', 'store', 'update', 'destroy']);
 
