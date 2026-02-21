@@ -74,17 +74,40 @@ const toggleAddSize = (size: string) => {
   i === -1 ? addForm.sizes.push(size) : addForm.sizes.splice(i, 1)
 }
 
-function addHandleFiles(files: FileList | File[]) {
-  const valid = Array.from(files).slice(0, addRemainingSlots.value).filter((f) => f.type.startsWith('image/'))
-  addForm.images = [...addForm.images, ...valid]
+async function compressImage(file: File): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const maxWidth = 1200
+      const scale = Math.min(1, maxWidth / img.width)
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width * scale
+      canvas.height = img.height * scale
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      canvas.toBlob((blob) => {
+        URL.revokeObjectURL(url)
+        resolve(new File([blob!], file.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' }))
+      }, 'image/webp', 0.8)
+    }
+    img.src = url
+  })
 }
-const addOnDrop = (e: DragEvent) => {
-  e.preventDefault(); addIsDragging.value = false
-  if (e.dataTransfer?.files) addHandleFiles(e.dataTransfer.files)
+
+async function addHandleFiles(files: FileList | File[]) {
+  const raw = Array.from(files).slice(0, addRemainingSlots.value).filter((f) => f.type.startsWith('image/'))
+  const compressed = await Promise.all(raw.map(compressImage))
+  addForm.images = [...addForm.images, ...compressed]
 }
-const addOnFileInput = (e: Event) => {
+const addOnDrop = async (e: DragEvent) => {
+  e.preventDefault()
+  addIsDragging.value = false
+  if (e.dataTransfer?.files) await addHandleFiles(e.dataTransfer.files)
+}
+const addOnFileInput = async (e: Event) => {
   const input = e.target as HTMLInputElement
-  if (input.files) addHandleFiles(input.files)
+  if (input.files) await addHandleFiles(input.files)
   input.value = ''
 }
 const removeAddImage = (index: number) => {
@@ -155,17 +178,19 @@ const toggleEditSize = (size: string) => {
   const i = editForm.sizes.indexOf(size)
   i === -1 ? editForm.sizes.push(size) : editForm.sizes.splice(i, 1)
 }
-function editHandleFiles(files: FileList | File[]) {
-  const valid = Array.from(files).slice(0, editRemainingSlots.value).filter((f) => f.type.startsWith('image/'))
-  editForm.images = [...editForm.images, ...valid]
+async function editHandleFiles(files: FileList | File[]) {
+  const raw = Array.from(files).slice(0, editRemainingSlots.value).filter((f) => f.type.startsWith('image/'))
+  const compressed = await Promise.all(raw.map(compressImage))
+  editForm.images = [...editForm.images, ...compressed]
 }
-const editOnDrop = (e: DragEvent) => {
-  e.preventDefault(); editIsDragging.value = false
-  if (e.dataTransfer?.files) editHandleFiles(e.dataTransfer.files)
+const editOnDrop = async (e: DragEvent) => {
+  e.preventDefault()
+  editIsDragging.value = false
+  if (e.dataTransfer?.files) await editHandleFiles(e.dataTransfer.files)
 }
-const editOnFileInput = (e: Event) => {
+const editOnFileInput = async (e: Event) => {
   const input = e.target as HTMLInputElement
-  if (input.files) editHandleFiles(input.files)
+  if (input.files) await editHandleFiles(input.files)
   input.value = ''
 }
 const removeEditImage     = (index: number) => {
