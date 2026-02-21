@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Product;
+use Faker\Provider\Image as ImageIntervention;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
@@ -36,7 +37,7 @@ class ProductController extends Controller
             'colors' => 'required|array',
             'sizes' => 'required|array',
             'images' => 'nullable|array|max:3',
-            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:15360',
         ]);
 
         $slug = Str::slug($validated['name']);
@@ -76,7 +77,7 @@ class ProductController extends Controller
             'colors' => 'required|array',
             'sizes' => 'required|array',
             'images' => 'nullable|array|max:3',
-            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:15360',
             'removed_image_ids' => 'nullable|array',
             'removed_image_ids.*' => 'nullable|integer',
         ]);
@@ -143,7 +144,6 @@ class ProductController extends Controller
     {
         $uploadPath = $this->getUploadPath();
 
-        // Ensure directory exists
         if (!file_exists($uploadPath)) {
             mkdir($uploadPath, 0755, true);
         }
@@ -151,15 +151,16 @@ class ProductController extends Controller
         foreach ($images as $image) {
             if (!$image) continue;
 
-            $filename = time() . '_' . Str::random(20) . '.' . $image->getClientOriginalExtension();
+            $filename = time() . '_' . Str::random(20) . '.webp';
 
-            $image->move($uploadPath, $filename);
-
-            // Store relative path (just filename for URL)
-            $relativePath = 'uploads/' . $filename;
+            // Resize and compress
+            ImageIntervention::read($image)
+                ->scaleDown(width: 1200)        // max width 1200px, keeps aspect ratio
+                ->toWebp(quality: 80)           // convert to webp at 80% quality
+                ->save($uploadPath . '/' . $filename);
 
             $product->images()->create([
-                'path' => $relativePath,
+                'path' => 'uploads/' . $filename,
             ]);
         }
     }
