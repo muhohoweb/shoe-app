@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Product;
-use Faker\Provider\Image as ImageIntervention;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
+use Intervention\Image\Laravel\Facades\Image;
 
 class ProductController extends Controller
 {
@@ -154,7 +154,7 @@ class ProductController extends Controller
             $filename = time() . '_' . Str::random(20) . '.webp';
 
             // Resize and compress
-            ImageIntervention::read($image)
+            Image::read($image)
                 ->scaleDown(width: 1200)        // max width 1200px, keeps aspect ratio
                 ->toWebp(quality: 80)           // convert to webp at 80% quality
                 ->save($uploadPath . '/' . $filename);

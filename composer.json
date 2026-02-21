@@ -13,6 +13,7 @@
         "iankumu/mpesa": "*",
         "inertiajs/inertia-laravel": "^2.0",
         "intervention/image": "*",
+        "intervention/image-laravel": "*",
         "laravel/fortify": "^1.30",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
