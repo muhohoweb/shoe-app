@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
 use Intervention\Image\Laravel\Facades\Image;
@@ -28,6 +29,7 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
+        Log::info('Store called', $request->all());
         $validated = $request->validate([
             'category_id' => 'required|exists:categories,id',
             'name' => 'required|string|max:255',
@@ -39,6 +41,8 @@ class ProductController extends Controller
             'images' => 'nullable|array|max:3',
             'images.*' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:15360',
         ]);
+
+        Log::info('Validated', $validated);
 
         $slug = Str::slug($validated['name']);
         $originalSlug = $slug;
