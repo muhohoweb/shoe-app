@@ -15,6 +15,7 @@ use App\Http\Controllers\CategoryController;
 
 Route::get('/', [ShopController::class, 'index'])->name('home');
 Route::get('/dental/services', [DentalService::class, 'index'])->name('dental.index');
+Route::post('/dental/services/order', [DentalService::class, 'store'])->name('dental.store');
 
 
 Route::middleware(['auth'])->group(function () {

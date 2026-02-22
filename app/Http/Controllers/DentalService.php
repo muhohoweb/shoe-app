@@ -42,4 +42,25 @@ class DentalService extends Controller
 
         return response()->json($services);
     }
+
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'client_name'    => 'required|string',
+            'client_email'   => 'required|email',
+            'service_name'   => 'required|string',
+            'tooth_number'   => 'nullable|string',
+            'shade'          => 'nullable|string',
+            'estimated_days' => 'required|integer',
+            'price'          => 'required|numeric',
+            'notes'          => 'nullable|string',
+        ]);
+
+        // For now return the payload back as confirmation
+        return response()->json([
+            'message' => 'Order received successfully',
+            'order'   => $validated,
+        ], 201);
+    }
 }
