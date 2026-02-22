@@ -327,6 +327,7 @@ const editForm = useForm({
   status: '',
   payment_status: '',
   tracking_number: '',
+  send_dispatch: false,  // add this
 })
 
 const openEditDialog = (order: Order) => {
@@ -334,6 +335,7 @@ const openEditDialog = (order: Order) => {
   editForm.status = order.status
   editForm.payment_status = order.payment_status
   editForm.tracking_number = order.tracking_number || ''
+  editForm.send_dispatch = order.status === 'completed'
   editForm.clearErrors()
   isEditDialogOpen.value = true
 }
@@ -345,23 +347,23 @@ const closeEditDialog = () => {
 }
 
 const handleEditSubmit = () => {
-  if (!editingOrder.value) return
-  editForm.put(`/orders/${editingOrder.value.id}`, {
+  const payload = {
+    status: editForm.status,
+    payment_status: editForm.payment_status,
+    tracking_number: editForm.tracking_number,
+    send_dispatch: editForm.status === 'completed' && editForm.payment_status === 'paid',
+  }
+  console.log('edit payload', payload)
+
+  editForm.send_dispatch = payload.send_dispatch  // sync to form
+
+  editForm.put(`/orders/${editingOrder.value!.id}`, {
     preserveScroll: true,
-    data: {
-      status: editForm.status,
-      payment_status: editForm.payment_status,
-      tracking_number: editForm.tracking_number,
-      send_dispatch: editForm.status === 'completed',  // add this
-    },
     onSuccess: () => {
       toast.success('Order Updated')
       closeEditDialog()
     },
-    onError: (errors) => {
-      console.log(errors)  // check what's actually failing
-      toast.error('Update Failed')
-    },
+    onError: (errors) => { console.log(errors) },
   })
 }
 
