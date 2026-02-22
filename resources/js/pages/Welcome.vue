@@ -1014,8 +1014,17 @@ body { font-family: 'Inter', sans-serif; background: var(--cream); color: var(--
 .animate-spin { animation: spin 1s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-/* RESPONSIVE */
 @media (max-width: 768px) {
+  .modal-close-btn {
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    z-index: 9999;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+    width: 40px;
+    height: 40px;
+  }
   .nav-container { height: 56px; padding: 0 16px; }
   .logo { font-size: 1.2rem; }
   .hero-section { height: 350px; margin-top: 56px; }
