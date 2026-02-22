@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DentalService;
 use App\Http\Controllers\MpesaController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
@@ -13,6 +14,7 @@ use Inertia\Inertia;
 use App\Http\Controllers\CategoryController;
 
 Route::get('/', [ShopController::class, 'index'])->name('home');
+Route::get('/dental/services', [DentalService::class, 'index'])->name('dental.index');
 
 
 Route::middleware(['auth'])->group(function () {

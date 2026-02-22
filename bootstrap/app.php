@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'whatsapp/webhook',
             'whatsapp/webhook/',
             'whatsapp/send-dispatch/',
+            'dental/services'
         ]);
 
         $middleware->web(append: [
