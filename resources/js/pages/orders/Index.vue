@@ -348,11 +348,20 @@ const handleEditSubmit = () => {
   if (!editingOrder.value) return
   editForm.put(`/orders/${editingOrder.value.id}`, {
     preserveScroll: true,
+    data: {
+      status: editForm.status,
+      payment_status: editForm.payment_status,
+      tracking_number: editForm.tracking_number,
+      send_dispatch: editForm.status === 'completed',  // add this
+    },
     onSuccess: () => {
       toast.success('Order Updated')
       closeEditDialog()
     },
-    onError: () => toast.error('Update Failed'),
+    onError: (errors) => {
+      console.log(errors)  // check what's actually failing
+      toast.error('Update Failed')
+    },
   })
 }
 
