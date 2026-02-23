@@ -11,32 +11,58 @@ class WhatsAppController extends Controller
     public function webhook(Request $request)
     {
         if ($request->isMethod('get')) {
-            $verifyToken = env('WHATSAPP_VERIFY_TOKEN');
-            if ($request->query('hub_verify_token') === $verifyToken) {
-                return response($request->query('hub_challenge'), 200);
-            }
-            return response('Invalid token', 403);
+            return response()->json(['status' => 'ok']);
         }
 
-        // Extract incoming message
-        $data = $request->all();
+        Log::info('FlareSend webhook received', $request->all());
 
-        $entry = $data['entry'][0] ?? null;
-        $changes = $entry['changes'][0]['value'] ?? null;
+        $event = $request->input('event');
 
-        // Check if it's an incoming message (not a status update)
-        if (isset($changes['messages'])) {
-            $message = $changes['messages'][0];
-            $from = $message['from'];           // Customer's phone number
-            $text = $message['text']['body'];   // Message content
-            $messageId = $message['id'];
-
-            Log::info("Message from {$from}: {$text}");
-
-            // TODO: Store in DB or process as needed
+        if ($event !== 'message_received') {
+            return response()->json(['status' => 'ignored']);
         }
 
-        return response('OK', 200);
+        $from    = $request->input('data.from');
+        $message = $request->input('data.message.conversation');
+
+        if (!$from || !$message) {
+            return response()->json(['status' => 'missing_data'], 400);
+        }
+
+        $phone = preg_replace('/@(s\.whatsapp\.net|lid)$/', '', $from);
+
+        // Fetch dental services
+        $services = Http::get('https://drmorch.medicareers.co.ke/dental/services')->json();
+
+        // Ask Claude to process the order
+        $claude = Http::withHeaders([
+            'x-api-key'         => config('services.anthropic.key'),
+            'anthropic-version' => '2023-06-01',
+            'Content-Type'      => 'application/json',
+        ])->post('https://api.anthropic.com/v1/messages', [
+            'model'      => 'claude-haiku-4-5-20251001',
+            'max_tokens' => 500,
+            'messages'   => [[
+                'role'    => 'user',
+                'content' => "You are a dental lab assistant. A client sent this WhatsApp message: \"{$message}\"\n\nAvailable services: " . json_encode($services) . "\n\nRespond ONLY with a valid JSON object, no extra text:\n{\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}",
+            ]],
+        ]);
+
+        $order = json_decode($claude->json()['content'][0]['text'], true);
+        $order['client_phone'] = $phone;
+
+        Log::info('WhatsApp order processed', $order);
+
+        // Save order
+        Http::post('https://drmorch.medicareers.co.ke/dental/services/order', $order);
+
+        // Reply to client
+        $this->sendWhatsAppMessage(new Request([
+            'phone'   => $phone,
+            'message' => "Thank you! Your order for *{$order['service_name']}* has been received.\nPrice: $" . $order['price'] . "\nEstimated delivery: {$order['estimated_days']} days.",
+        ]));
+
+        return response()->json(['status' => 'received']);
     }
 
     /** @deprecated Use sendWhatsAppMessage() with FlareSend instead */
