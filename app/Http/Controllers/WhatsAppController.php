@@ -118,10 +118,11 @@ class WhatsAppController extends Controller
     public function sendWhatsAppMessage(Request $request): bool
     {
         try {
-            $response = Http::timeout(5)->withHeaders([
+            $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . config('services.flaresend.key'),
                 'Content-Type'  => 'application/json',
-            ])->post('https://api.flaresend.com/send-message', [
+                'Host'          => 'api.flaresend.com',
+            ])->post('https://57.128.52.136/send-message', [
                 'recipients' => [$request->phone],
                 'type'       => 'text',
                 'text'       => $request->message,
