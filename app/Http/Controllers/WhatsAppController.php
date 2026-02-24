@@ -32,7 +32,7 @@ class WhatsAppController extends Controller
         $phone = preg_replace('/@(s\.whatsapp\.net|lid)$/', '', $from);
 
         // Fetch dental services
-        $services = Http::get('https://drmorch.medicareers.co.ke/dental/services')->json();
+        $services = (new DentalService())->getServices();
 
         // Ask Claude to process the order
         $claude = Http::withHeaders([
