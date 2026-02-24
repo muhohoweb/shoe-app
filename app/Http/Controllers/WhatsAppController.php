@@ -117,26 +117,27 @@ class WhatsAppController extends Controller
 
     public function sendWhatsAppMessage(Request $request): bool
     {
-        $request->validate([
-            'phone' => 'required|string',
-            'message' => 'required|string',
-        ]);
+        try {
+            $response = Http::timeout(5)->withHeaders([
+                'Authorization' => 'Bearer ' . config('services.flaresend.key'),
+                'Content-Type'  => 'application/json',
+            ])->post('https://api.flaresend.com/send-message', [
+                'recipients' => [$request->phone],
+                'type'       => 'text',
+                'text'       => $request->message,
+            ]);
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . config('services.flaresend.key'),
-            'Content-Type' => 'application/json',
-        ])->post('https://api.flaresend.com/send-message', [
-            'recipients' => [$request->phone],
-            'type' => 'text',
-            'text' => $request->message,
-        ]);
+            Log::info('FlareSend response', [
+                'status' => $response->status(),
+                'body'   => $response->json(),
+            ]);
 
-        Log::info('FlareSend response', [
-            'status' => $response->status(),
-            'body' => $response->json(),
-        ]);
+            return $response->successful();
 
-        return $response->successful();
+        } catch (\Exception $e) {
+            Log::error('FlareSend send failed', ['error' => $e->getMessage()]);
+            return false;
+        }
     }
 
     public function sendDispatchNotification(Request $request)
