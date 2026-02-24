@@ -11,14 +11,12 @@ class WhatsAppController extends Controller
     public function webhook(Request $request)
     {
         Log::info('Full webhook payload', $request->all());
+
         if ($request->isMethod('get')) {
             return response()->json(['status' => 'ok']);
         }
 
-        Log::info('FlareSend webhook received', $request->all());
-
         $event = $request->input('event');
-
         if ($event !== 'message_received') {
             return response()->json(['status' => 'ignored']);
         }
@@ -32,10 +30,30 @@ class WhatsAppController extends Controller
 
         $phone = preg_replace('/@(s\.whatsapp\.net|lid)$/', '', $from);
 
-        // Fetch dental services
+        // Load conversation history
+        $cacheKey = "whatsapp_chat_{$phone}";
+        $history  = cache()->get($cacheKey, []);
+
+        // Add client message to history
+        $history[] = ['role' => 'user', 'content' => $message];
+
         $services = (new DentalService())->getServices();
 
-        // Ask Claude to process the order
+        $systemPrompt = "You are a dental lab assistant for Dr. Morch Crafts. 
+Your job is to collect order details from clients via WhatsApp before placing an order.
+
+Available services: " . json_encode($services) . "
+
+Follow these steps:
+1. Greet the client and identify the service they need
+2. Ask for tooth number if not provided
+3. Ask for shade if relevant (crowns, veneers)
+4. Confirm all details with the client
+5. Once confirmed, respond ONLY with this JSON (no other text):
+{\"order_ready\":true,\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}
+
+Until you have all details, respond conversationally in plain text.";
+
         $claude = Http::withHeaders([
             'x-api-key'         => config('services.anthropic.key'),
             'anthropic-version' => '2023-06-01',
@@ -43,31 +61,39 @@ class WhatsAppController extends Controller
         ])->post('https://api.anthropic.com/v1/messages', [
             'model'      => 'claude-haiku-4-5-20251001',
             'max_tokens' => 500,
-            'messages'   => [[
-                'role'    => 'user',
-                'content' => "You are a dental lab assistant. A client sent this WhatsApp message: \"{$message}\"\n\nAvailable services: " . json_encode($services) . "\n\nRespond ONLY with a valid JSON object, no extra text:\n{\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}",
-            ]],
+            'system'     => $systemPrompt,
+            'messages'   => $history,
         ]);
 
-        $rawText = $claude->json()['content'][0]['text'] ?? '{}';
-        $cleaned = preg_replace('/```json|```/', '', $rawText);
-        $order = json_decode(trim($cleaned), true) ?? [];
+        $reply = $claude->json()['content'][0]['text'] ?? '';
 
-        if (empty($order) || !isset($order['service_name'])) {
-            Log::error('Claude returned invalid order', ['raw' => $rawText]);
-            return response()->json(['status' => 'received']);
+        // Add Claude reply to history
+        $history[] = ['role' => 'assistant', 'content' => $reply];
+
+        // Save history for 30 minutes
+        cache()->put($cacheKey, $history, now()->addMinutes(30));
+
+        // Check if Claude has collected all details
+        $cleaned = preg_replace('/```json|```/', '', $reply);
+        $order   = json_decode(trim($cleaned), true);
+
+        if (isset($order['order_ready']) && $order['order_ready'] === true) {
+            // Place the order
+            $order['client_phone'] = $phone;
+            Http::post('https://drmorch.medicareers.co.ke/dental/services/order', $order);
+
+            // Clear conversation
+            cache()->forget($cacheKey);
+
+            $replyMessage = "✅ Order confirmed!\n*{$order['service_name']}*\nPrice: \${$order['price']}\nEstimated delivery: {$order['estimated_days']} days.\nWe'll notify you when it's ready!";
+        } else {
+            // Send Claude's question back to client
+            $replyMessage = $reply;
         }
-        $order['client_phone'] = $phone;
 
-        Log::info('WhatsApp order processed', $order);
-
-        // Save order
-        Http::post('https://drmorch.medicareers.co.ke/dental/services/order', $order);
-
-        // Reply to client
         $this->sendWhatsAppMessage(new Request([
             'phone'   => $phone,
-            'message' => "Thank you! Your order for *{$order['service_name']}* has been received.\nPrice: $" . $order['price'] . "\nEstimated delivery: {$order['estimated_days']} days.",
+            'message' => $replyMessage,
         ]));
 
         return response()->json(['status' => 'received']);
