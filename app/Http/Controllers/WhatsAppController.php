@@ -48,7 +48,14 @@ class WhatsAppController extends Controller
             ]],
         ]);
 
-        $order = json_decode($claude->json()['content'][0]['text'], true);
+        $rawText = $claude->json()['content'][0]['text'] ?? '{}';
+        $cleaned = preg_replace('/```json|```/', '', $rawText);
+        $order = json_decode(trim($cleaned), true) ?? [];
+
+        if (empty($order) || !isset($order['service_name'])) {
+            Log::error('Claude returned invalid order', ['raw' => $rawText]);
+            return response()->json(['status' => 'received']);
+        }
         $order['client_phone'] = $phone;
 
         Log::info('WhatsApp order processed', $order);
