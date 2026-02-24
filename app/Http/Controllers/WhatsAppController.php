@@ -21,7 +21,7 @@ class WhatsAppController extends Controller
             return response()->json(['status' => 'ignored']);
         }
 
-        $from    = $request->input('data.from');
+        $from = $request->input('data.from');
         $message = $request->input('data.message.conversation');
 
         if (!$from || !$message) {
@@ -32,7 +32,7 @@ class WhatsAppController extends Controller
 
         // Load conversation history
         $cacheKey = "whatsapp_chat_{$phone}";
-        $history  = cache()->get($cacheKey, []);
+        $history = cache()->get($cacheKey, []);
 
         // Add client message to history
         $history[] = ['role' => 'user', 'content' => $message];
@@ -56,14 +56,14 @@ class WhatsAppController extends Controller
         Until you have all details, respond conversationally in plain text.";
 
         $claude = Http::withHeaders([
-            'x-api-key'         => config('services.anthropic.key'),
+            'x-api-key' => config('services.anthropic.key'),
             'anthropic-version' => '2023-06-01',
-            'Content-Type'      => 'application/json',
+            'Content-Type' => 'application/json',
         ])->post('https://api.anthropic.com/v1/messages', [
-            'model'      => 'claude-haiku-4-5-20251001',
+            'model' => 'claude-haiku-4-5-20251001',
             'max_tokens' => 500,
-            'system'     => $systemPrompt,
-            'messages'   => $history,
+            'system' => $systemPrompt,
+            'messages' => $history,
         ]);
 
         $reply = $claude->json()['content'][0]['text'] ?? '';
@@ -76,7 +76,7 @@ class WhatsAppController extends Controller
 
         // Check if Claude has collected all details
         $cleaned = preg_replace('/```json|```/', '', $reply);
-        $order   = json_decode(trim($cleaned), true);
+        $order = json_decode(trim($cleaned), true);
 
         if (isset($order['order_ready']) && $order['order_ready'] === true) {
             // Place the order
@@ -93,7 +93,7 @@ class WhatsAppController extends Controller
         }
 
         $this->sendWhatsAppMessage(new Request([
-            'phone'   => $phone,
+            'phone' => $phone,
             'message' => $replyMessage,
         ]));
 
@@ -101,7 +101,8 @@ class WhatsAppController extends Controller
     }
 
     /** @deprecated Use sendWhatsAppMessage() with FlareSend instead */
-    public function sendOldWhatsAppMessage(Request $request): bool {
+    public function sendOldWhatsAppMessage(Request $request): bool
+    {
         $request->validate([
             'phone' => 'required|string',
             'message' => 'required|string',
@@ -118,24 +119,44 @@ class WhatsAppController extends Controller
     public function sendWhatsAppMessage(Request $request): bool
     {
         try {
-            $response = Http::timeout(5)->withHeaders([
+            $response = Http::timeout(5)->withOptions([
+                'curl' => [
+                    CURLOPT_RESOLVE => ['api.flaresend.com:443:57.128.52.136'],
+                ],
+            ])->withHeaders([
                 'Authorization' => 'Bearer ' . config('services.flaresend.key'),
-                'Content-Type'  => 'application/json',
+                'Content-Type' => 'application/json',
             ])->post('https://api.flaresend.com/send-message', [
                 'recipients' => [$request->phone],
-                'type'       => 'text',
-                'text'       => $request->message,
+                'type' => 'text',
+                'text' => $request->message,
             ]);
 
-            Log::info('FlareSend response', [
-                'status' => $response->status(),
-                'body'   => $response->json(),
-            ]);
+            $status = $response->successful() ? 'SUCCESS' : 'FAILED';
 
-            return $response->successful();
+            Log::info("
+            ========================================
+             WHATSAPP MESSAGE | {$status}
+            ========================================
+             To      : {$request->phone}
+             Message : {$request->message}
+             Status  : {$response->status()}
+             Response: " . json_encode($response->json(), JSON_PRETTY_PRINT) . "
+            ========================================
+                    ");
 
-        } catch (\Exception $e) {
-            Log::error('FlareSend send failed', ['error' => $e->getMessage()]);
+                        return $response->successful();
+
+                    } catch (\Exception $e) {
+                        Log::error("
+            ========================================
+             WHATSAPP MESSAGE | ERROR
+            ========================================
+             To      : {$request->phone}
+             Message : {$request->message}
+             Error   : {$e->getMessage()}
+            ========================================
+        ");
             return false;
         }
     }
