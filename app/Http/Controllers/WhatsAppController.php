@@ -39,20 +39,21 @@ class WhatsAppController extends Controller
 
         $services = (new DentalService())->getServices();
 
-        $systemPrompt = "You are a dental lab assistant for Dr. Morch Crafts. 
-Your job is to collect order details from clients via WhatsApp before placing an order.
-
-Available services: " . json_encode($services) . "
-
-Follow these steps:
-1. Greet the client and identify the service they need
-2. Ask for tooth number if not provided
-3. Ask for shade if relevant (crowns, veneers)
-4. Confirm all details with the client
-5. Once confirmed, respond ONLY with this JSON (no other text):
-{\"order_ready\":true,\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}
-
-Until you have all details, respond conversationally in plain text.";
+        $systemPrompt = "You are a dental lab assistant for Digital Art Dental Studios. 
+        Your job is to collect order details from clients via WhatsApp before placing an order.
+        
+        Available services: " . json_encode($services) . "
+        
+        Follow these steps:
+        1. Greet the client and identify the service they need
+        2. Ask for tooth number if not provided
+        3. Ask for shade if relevant (crowns, veneers)
+        4. Confirm all details with the client
+        5. Once confirmed, respond ONLY with this JSON (no other text):
+        {\"order_ready\":true,\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}
+        
+        Currency is Kenyan Shillings (Ksh). Do NOT use markdown formatting like ** or * in your responses. Use plain text only.
+        Until you have all details, respond conversationally in plain text.";
 
         $claude = Http::withHeaders([
             'x-api-key'         => config('services.anthropic.key'),
@@ -85,7 +86,7 @@ Until you have all details, respond conversationally in plain text.";
             // Clear conversation
             cache()->forget($cacheKey);
 
-            $replyMessage = "✅ Order confirmed!\n*{$order['service_name']}*\nPrice: \${$order['price']}\nEstimated delivery: {$order['estimated_days']} days.\nWe'll notify you when it's ready!";
+            $replyMessage = "Order confirmed!\n{$order['service_name']}\nPrice: Ksh " . ($order['price'] * 130) . "\nEstimated delivery: {$order['estimated_days']} days.\nWe will notify you when it is ready!";
         } else {
             // Send Claude's question back to client
             $replyMessage = $reply;
