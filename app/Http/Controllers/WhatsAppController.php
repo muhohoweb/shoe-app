@@ -72,11 +72,9 @@ class WhatsAppController extends Controller
                 Log::info('Processing as regular message with sender');
                 $this->processRegularMessage($extractedData);
             } else {
-                // STEP 3: No sender and not a job - save for review but also try to parse as job anyway
-                Log::info('No sender and not clearly a job, but might be job-related - sending to Claude for analysis');
-
-                // Let Claude analyze it to be sure
-                $this->analyzeWithClaude($text, $extractedData);
+                // STEP 3: No sender and not a job - save for review
+                Log::info('No sender and not clearly a job - saving for review');
+                $this->saveDebugMessage($text, 'unknown', 'needs_review');
             }
         }
 
@@ -84,7 +82,7 @@ class WhatsAppController extends Controller
     }
 
     /**
-     * Enhanced job posting detection
+     * Enhanced job posting detection with scoring
      */
     private function isJobPosting(string $text): bool
     {
@@ -146,65 +144,8 @@ class WhatsAppController extends Controller
 
         Log::info('Job posting score: ' . $score . ' for text: ' . substr($text, 0, 50));
 
-        // Lower threshold to catch more job posts
+        // Threshold to catch job posts
         return $score >= 3;
-    }
-
-    /**
-     * Analyze ambiguous messages with Claude
-     */
-    private function analyzeWithClaude(string $text, array $extractedData): void
-    {
-        try {
-            $claude = Http::withHeaders([
-                'x-api-key' => config('services.anthropic.key'),
-                'anthropic-version' => '2023-06-01',
-                'Content-Type' => 'application/json',
-            ])->post('https://api.anthropic.com/v1/messages', [
-                'model' => 'claude-3-haiku-20240307',
-                'max_tokens' => 500,
-                'system' => "Analyze this message and determine if it's a job posting or job-related opportunity. 
-Return JSON with:
-{
-  \"is_job\": true/false,
-  \"confidence\": 0-100,
-  \"reason\": \"brief explanation\",
-  \"extracted_info\": {
-    \"title\": \"any job title mentioned\",
-    \"organization\": \"any organization mentioned\",
-    \"location\": \"any location mentioned\",
-    \"contact\": \"any contact info\"
-  }
-}",
-                'messages' => [
-                    ['role' => 'user', 'content' => $text],
-                ],
-            ]);
-
-            if ($claude->successful()) {
-                $reply = $claude->json()['content'][0]['text'] ?? null;
-                if ($reply) {
-                    $reply = preg_replace('/```json\s*|\s*```/', '', $reply);
-                    $analysis = json_decode(trim($reply), true);
-
-                    if ($analysis && ($analysis['is_job'] ?? false) && ($analysis['confidence'] ?? 0) > 60) {
-                        Log::info('Claude confirms this is a job posting', $analysis);
-
-                        // Process as job
-                        $jobMessage = ['conversation' => $text, 'id' => $extractedData['message_id'] ?? uniqid()];
-                        $this->handleChannelJob($jobMessage, 'claude_identified');
-                        return;
-                    }
-                }
-            }
-
-            // If not a job or Claude unsure, save for review
-            $this->saveDebugMessage($text, 'unknown', 'needs_review');
-
-        } catch (\Exception $e) {
-            Log::error('Error in analyzeWithClaude: ' . $e->getMessage());
-            $this->saveDebugMessage($text, 'unknown', 'analysis_error');
-        }
     }
 
     /**
@@ -299,27 +240,6 @@ Return JSON with:
     }
 
     /**
-     * Check if text is likely a job posting
-     */
-    private function isJobPosting(string $text): bool
-    {
-        $jobIndicators = [
-            '/\b(physiotherapist|radiologist|doctor|nurse|officer|manager|assistant|technician|specialist|position|vacancy|opportunity|hiring|recruitment|job|career)\b/i',
-            '/\b(apply|application|cv|resume|cover letter|how to apply|requirements?|qualifications?|experience|diploma|degree|certificate|registered)\b/i',
-            '/\b(p\.?o\.? box|email:|@|\.ke|nairobi|kenya|university|hospital|institution|ministry|authority|commission)\b/i'
-        ];
-
-        $score = 0;
-        foreach ($jobIndicators as $pattern) {
-            if (preg_match($pattern, $text)) {
-                $score++;
-            }
-        }
-
-        return $score >= 2;
-    }
-
-    /**
      * Process regular messages (dental orders, etc.)
      */
     private function processRegularMessage(array $extractedData): void
@@ -392,7 +312,7 @@ Return JSON with:
         ]));
     }
 
-    // ========== YOUR EXISTING METHODS (KEPT INTACT) ==========
+    // ========== JOB HANDLING METHODS ==========
 
     public function testJobPost(Request $request)
     {
@@ -658,12 +578,16 @@ Return a JSON object with these fields (use null if not found):
             $entry .= "EXPERIENCE: " . $job['experience'] . "\n";
         }
 
+        if (!empty($job['gender_preference'])) {
+            $entry .= "GENDER PREFERENCE: " . $job['gender_preference'] . "\n";
+        }
+
         if (!empty($job['salary'])) {
             $entry .= "SALARY: " . $job['salary'] . "\n";
         }
 
-        if (!empty($job['application_deadline'])) {
-            $entry .= "DEADLINE: " . $job['application_deadline'] . "\n";
+        if (!empty($job['deadline'])) {
+            $entry .= "DEADLINE: " . $job['deadline'] . "\n";
         }
 
         $entry .= str_repeat('-', 80) . "\n";
@@ -683,29 +607,30 @@ Return a JSON object with these fields (use null if not found):
             }
         }
 
-        if (!empty($job['how_to_apply'])) {
-            $entry .= "\nHOW TO APPLY:\n" . $job['how_to_apply'] . "\n";
+        if (!empty($job['skills']) && is_array($job['skills'])) {
+            $entry .= "\nSKILLS:\n";
+            foreach ($job['skills'] as $skill) {
+                $entry .= "• " . $skill . "\n";
+            }
         }
 
         if (!empty($job['contact_info'])) {
             $entry .= "\nCONTACT INFORMATION:\n";
             foreach ($job['contact_info'] as $key => $value) {
                 if ($value) {
-                    $entry .= strtoupper($key) . ": " . $value . "\n";
+                    if (is_array($value)) {
+                        $entry .= strtoupper($key) . ": " . implode(', ', $value) . "\n";
+                    } else {
+                        $entry .= strtoupper($key) . ": " . $value . "\n";
+                    }
                 }
             }
         }
 
-        if (!empty($job['extracted_phone'])) {
-            $entry .= "CONTACT PHONE: " . $job['extracted_phone'] . "\n";
-        }
-        if (!empty($job['extracted_email'])) {
-            $entry .= "CONTACT EMAIL: " . $job['extracted_email'] . "\n";
-        }
-
         $entry .= str_repeat('-', 80) . "\n";
         $entry .= "SOURCE PHONE: " . ($job['source_phone'] ?? 'N/A') . "\n";
-        $entry .= "RAW TEXT:\n" . ($job['raw_text'] ?? 'N/A') . "\n";
+        $entry .= "MESSAGE ID: " . ($job['message_id'] ?? 'N/A') . "\n";
+        $entry .= "PARSED AT: " . ($job['parsed_at'] ?? 'N/A') . "\n";
         $entry .= str_repeat('=', 80) . "\n\n";
 
         file_put_contents($filePath, $entry, FILE_APPEND | LOCK_EX);
@@ -713,6 +638,8 @@ Return a JSON object with these fields (use null if not found):
 
         Log::info('✓ Job saved', ['title' => $job['title'] ?? 'Unknown']);
     }
+
+    // ========== MEDIA HANDLING METHODS ==========
 
     private function downloadAndSaveMedia(array $media, string $type): ?string
     {
@@ -786,6 +713,8 @@ Return a JSON object with these fields (use null if not found):
         }
     }
 
+    // ========== WHATSAPP MESSAGE SENDING METHODS ==========
+
     public function sendWhatsAppMessage(Request $request): bool
     {
         try {
@@ -820,6 +749,22 @@ Return a JSON object with these fields (use null if not found):
             Log::error("WHATSAPP MESSAGE ERROR: " . $e->getMessage());
             return false;
         }
+    }
+
+    /** @deprecated Use sendWhatsAppMessage() with FlareSend instead */
+    public function sendOldWhatsAppMessage(Request $request): bool
+    {
+        $request->validate([
+            'phone' => 'required|string',
+            'message' => 'required|string',
+        ]);
+
+        $response = Http::post(config('services.whats_app_service.key'), [
+            'phone' => $request->phone,
+            'message' => $request->message,
+        ]);
+
+        return $response->successful();
     }
 
     public function sendDispatchNotification(Request $request)
