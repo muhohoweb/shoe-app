@@ -28,20 +28,27 @@ class WhatsAppController extends Controller
             return response()->json(['status' => 'ignored']);
         }
 
-        $from = $request->input('data.from');
+        $from    = $request->input('data.from');
         $message = $request->input('data.message');
 
         if (!$from) {
             return response()->json(['status' => 'missing_data'], 400);
         }
 
+        // Ignore internal WhatsApp protocol messages (sync, key share, etc.)
+        if (isset($message['protocolMessage'])) {
+            return response()->json(['status' => 'protocol_ignored']);
+        }
+
         $phone = preg_replace('/@(s\.whatsapp\.net|lid)$/', '', $from);
 
-        // Detect forwarded channel messages (job adverts)
-        $isForwarded = isset($message['extendedTextMessage']['contextInfo']['isForwarded']);
-        $hasChannelInfo = isset($message['extendedTextMessage']['contextInfo']['forwardOrigin']);
+        // Detect forwarded channel messages — works for both extendedTextMessage and conversation
+        $isForwardedExtended     = isset($message['extendedTextMessage']['contextInfo']['isForwarded']);
+        $isForwardedConversation = isset($message['contextInfo']['isForwarded']);
+        $hasForwardOrigin        = isset($message['extendedTextMessage']['contextInfo']['forwardOrigin'])
+            || isset($message['contextInfo']['forwardOrigin']);
 
-        if ($isForwarded && $hasChannelInfo) {
+        if (($isForwardedExtended || $isForwardedConversation) && $hasForwardOrigin) {
             $this->handleChannelJob($message, $phone);
             return response()->json(['status' => 'job_processed']);
         }
@@ -64,7 +71,7 @@ class WhatsAppController extends Controller
         }
 
         $cacheKey = "whatsapp_chat_{$phone}";
-        $history = cache()->get($cacheKey, []);
+        $history  = cache()->get($cacheKey, []);
         $history[] = ['role' => 'user', 'content' => $text];
 
         $services = (new DentalService())->getServices();
@@ -86,14 +93,14 @@ class WhatsAppController extends Controller
     Until you have all details, respond conversationally in plain text.";
 
         $claude = Http::withHeaders([
-            'x-api-key' => config('services.anthropic.key'),
+            'x-api-key'         => config('services.anthropic.key'),
             'anthropic-version' => '2023-06-01',
-            'Content-Type' => 'application/json',
+            'Content-Type'      => 'application/json',
         ])->post('https://api.anthropic.com/v1/messages', [
-            'model' => 'claude-haiku-4-5-20251001',
+            'model'      => 'claude-haiku-4-5-20251001',
             'max_tokens' => 500,
-            'system' => $systemPrompt,
-            'messages' => $history,
+            'system'     => $systemPrompt,
+            'messages'   => $history,
         ]);
 
         $reply = $claude->json()['content'][0]['text'] ?? '';
@@ -102,7 +109,7 @@ class WhatsAppController extends Controller
         cache()->put($cacheKey, $history, now()->addMinutes(30));
 
         $cleaned = preg_replace('/```json|```/', '', $reply);
-        $order = json_decode(trim($cleaned), true);
+        $order   = json_decode(trim($cleaned), true);
 
         if (isset($order['order_ready']) && $order['order_ready'] === true) {
             $order['client_phone'] = $phone;
@@ -114,7 +121,7 @@ class WhatsAppController extends Controller
         }
 
         $this->sendWhatsAppMessage(new Request([
-            'phone' => $phone,
+            'phone'   => $phone,
             'message' => $replyMessage,
         ]));
 
