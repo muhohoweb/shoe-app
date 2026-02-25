@@ -38,20 +38,173 @@ class WhatsAppController extends Controller
 
         Log::info('Extracted data:', $extractedData);
 
-        // If we have any text content, let Claude analyze it
+        // If we have any text content, process it
         if (!empty($extractedData['text'])) {
-            // First check if it's a job posting (your existing job detection)
-            if ($this->isJobPosting($extractedData['text'])) {
-                Log::info('✓ Message identified as job posting');
-                $this->handleChannelJob(['conversation' => $extractedData['text']], $extractedData['sender'] ?? 'unknown');
+            $text = $extractedData['text'];
+
+            // STEP 1: Check if it's a job posting (using enhanced detection)
+            if ($this->isJobPosting($text)) {
+                Log::info('✓ Message identified as JOB POSTING');
+
+                // Extract phone from message if present
+                $contactPhone = null;
+                preg_match('/(?:\+?254|0)[7-9][0-9]{8}/', $text, $phoneMatches);
+                if (!empty($phoneMatches)) {
+                    $contactPhone = $phoneMatches[0];
+                    Log::info('Found contact phone in message: ' . $contactPhone);
+                }
+
+                // Create a message structure for handleChannelJob
+                $jobMessage = [
+                    'conversation' => $text,
+                    'id' => $extractedData['message_id'] ?? uniqid()
+                ];
+
+                // Use the contact phone if found, otherwise use 'channel'
+                $sourcePhone = $contactPhone ?: 'whatsapp_channel';
+
+                $this->handleChannelJob($jobMessage, $sourcePhone);
                 return response()->json(['status' => 'job_processed']);
             }
 
-            // If not a job, process as regular message (dental orders, etc.)
-            $this->processRegularMessage($extractedData);
+            // STEP 2: If not a job, but has sender, process as regular message
+            if (!empty($extractedData['sender'])) {
+                Log::info('Processing as regular message with sender');
+                $this->processRegularMessage($extractedData);
+            } else {
+                // STEP 3: No sender and not a job - save for review but also try to parse as job anyway
+                Log::info('No sender and not clearly a job, but might be job-related - sending to Claude for analysis');
+
+                // Let Claude analyze it to be sure
+                $this->analyzeWithClaude($text, $extractedData);
+            }
         }
 
         return response()->json(['status' => 'processed']);
+    }
+
+    /**
+     * Enhanced job posting detection
+     */
+    private function isJobPosting(string $text): bool
+    {
+        $text = strtolower($text);
+
+        // Strong indicators (definitely a job)
+        $strongIndicators = [
+            'job', 'vacancy', 'hiring', 'position', 'career', 'opportunity',
+            'recruitment', 'apply', 'application', 'cv', 'resume', 'salary',
+            'experience', 'qualifications', 'requirements', 'candidate'
+        ];
+
+        // Medical/healthcare specific
+        $medicalIndicators = [
+            'doctor', 'nurse', 'clinical', 'medical', 'hospital', 'clinic',
+            'pharmacist', 'radiologist', 'physiotherapist', 'intern', 'pre intern',
+            'dispensing', 'drugs', 'procedures', 'clerking', 'labs', 'interpretation',
+            'adventist hospital', 'knh', 'kenyatta', 'mbagathi'
+        ];
+
+        // Application related
+        $applicationIndicators = [
+            'call', 'contact', 'send', 'email', 'apply', 'interview',
+            '074', '071', '072', '073', '075', '079', '070'  // Kenyan phone prefixes
+        ];
+
+        $score = 0;
+
+        // Check strong indicators (2 points each)
+        foreach ($strongIndicators as $indicator) {
+            if (str_contains($text, $indicator)) {
+                $score += 2;
+            }
+        }
+
+        // Check medical indicators (1 point each)
+        foreach ($medicalIndicators as $indicator) {
+            if (str_contains($text, $indicator)) {
+                $score += 1;
+            }
+        }
+
+        // Check application indicators (1 point each)
+        foreach ($applicationIndicators as $indicator) {
+            if (str_contains($text, $indicator)) {
+                $score += 1;
+            }
+        }
+
+        // Check for phone numbers
+        if (preg_match('/(?:\+?254|0)[7-9][0-9]{8}/', $text)) {
+            $score += 2;
+        }
+
+        // Check for email addresses
+        if (preg_match('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', $text)) {
+            $score += 2;
+        }
+
+        Log::info('Job posting score: ' . $score . ' for text: ' . substr($text, 0, 50));
+
+        // Lower threshold to catch more job posts
+        return $score >= 3;
+    }
+
+    /**
+     * Analyze ambiguous messages with Claude
+     */
+    private function analyzeWithClaude(string $text, array $extractedData): void
+    {
+        try {
+            $claude = Http::withHeaders([
+                'x-api-key' => config('services.anthropic.key'),
+                'anthropic-version' => '2023-06-01',
+                'Content-Type' => 'application/json',
+            ])->post('https://api.anthropic.com/v1/messages', [
+                'model' => 'claude-3-haiku-20240307',
+                'max_tokens' => 500,
+                'system' => "Analyze this message and determine if it's a job posting or job-related opportunity. 
+Return JSON with:
+{
+  \"is_job\": true/false,
+  \"confidence\": 0-100,
+  \"reason\": \"brief explanation\",
+  \"extracted_info\": {
+    \"title\": \"any job title mentioned\",
+    \"organization\": \"any organization mentioned\",
+    \"location\": \"any location mentioned\",
+    \"contact\": \"any contact info\"
+  }
+}",
+                'messages' => [
+                    ['role' => 'user', 'content' => $text],
+                ],
+            ]);
+
+            if ($claude->successful()) {
+                $reply = $claude->json()['content'][0]['text'] ?? null;
+                if ($reply) {
+                    $reply = preg_replace('/```json\s*|\s*```/', '', $reply);
+                    $analysis = json_decode(trim($reply), true);
+
+                    if ($analysis && ($analysis['is_job'] ?? false) && ($analysis['confidence'] ?? 0) > 60) {
+                        Log::info('Claude confirms this is a job posting', $analysis);
+
+                        // Process as job
+                        $jobMessage = ['conversation' => $text, 'id' => $extractedData['message_id'] ?? uniqid()];
+                        $this->handleChannelJob($jobMessage, 'claude_identified');
+                        return;
+                    }
+                }
+            }
+
+            // If not a job or Claude unsure, save for review
+            $this->saveDebugMessage($text, 'unknown', 'needs_review');
+
+        } catch (\Exception $e) {
+            Log::error('Error in analyzeWithClaude: ' . $e->getMessage());
+            $this->saveDebugMessage($text, 'unknown', 'analysis_error');
+        }
     }
 
     /**
@@ -340,20 +493,44 @@ class WhatsAppController extends Controller
 
             $text = $this->extractMessageText($message);
 
-            if (!$text || strlen(trim($text)) < 20) {
+            if (!$text || strlen(trim($text)) < 10) {
                 Log::info('Message too short or empty, skipping');
                 return;
             }
 
-            // Extract contact info
-            $contactPhone = null;
-            preg_match('/(?:\+?254|0)[7-9][0-9]{8}/', $text, $phoneMatches);
-            if (!empty($phoneMatches)) {
-                $contactPhone = $phoneMatches[0];
+            // Extract all contact information
+            $contactInfo = [];
+
+            // Extract phone numbers
+            preg_match_all('/(?:\+?254|0)[7-9][0-9]{8}/', $text, $phoneMatches);
+            if (!empty($phoneMatches[0])) {
+                $contactInfo['phones'] = $phoneMatches[0];
             }
 
-            preg_match('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', $text, $emailMatches);
+            // Extract emails
+            preg_match_all('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', $text, $emailMatches);
+            if (!empty($emailMatches[0])) {
+                $contactInfo['emails'] = $emailMatches[0];
+            }
 
+            // Extract organization/hospital names
+            $orgPatterns = [
+                '/([A-Z][a-z]+ (?:Hospital|Clinic|Medical Centre|Nursing Home))/',
+                '/([A-Z][a-z]+ University)/',
+                '/at\s+([A-Z][a-zA-Z\s]+)/',
+                '/([A-Z][a-zA-Z\s]+(?:Hospital|Clinic|Medical))/'
+            ];
+
+            $organizations = [];
+            foreach ($orgPatterns as $pattern) {
+                if (preg_match_all($pattern, $text, $orgMatches)) {
+                    $organizations = array_merge($organizations, $orgMatches[1]);
+                }
+            }
+
+            Log::info('Extracted contact info:', $contactInfo);
+
+            // Send to Claude for parsing with enhanced prompt
             $claude = Http::withHeaders([
                 'x-api-key' => config('services.anthropic.key'),
                 'anthropic-version' => '2023-06-01',
@@ -361,25 +538,27 @@ class WhatsAppController extends Controller
             ])->post('https://api.anthropic.com/v1/messages', [
                 'model' => 'claude-3-haiku-20240307',
                 'max_tokens' => 1000,
-                'system' => "You are a job listing parser for Kenyan jobs. Extract job details from the provided text.
-Return ONLY a valid JSON object with these exact keys:
+                'system' => "You are a Kenyan job posting parser. Extract ALL job details from the text.
+Return a JSON object with these fields (use null if not found):
 {
-  \"title\": \"job title\",
-  \"organization\": \"employer name\",
+  \"title\": \"job title/position\",
+  \"organization\": \"employer/hospital/clinic name\",
   \"location\": \"work location\",
-  \"job_type\": \"full-time/part-time/contract\",
-  \"description\": \"brief description\",
+  \"job_type\": \"full-time/part-time/internship/contract\",
+  \"description\": \"full job description\",
   \"requirements\": [\"array of requirements\"],
   \"qualifications\": [\"array of qualifications\"],
   \"experience\": \"experience needed\",
-  \"salary\": \"salary if mentioned\",
-  \"application_deadline\": \"deadline date\",
+  \"gender_preference\": \"any gender preference mentioned\",
+  \"skills\": [\"specific skills required\"],
   \"contact_info\": {
-    \"email\": \"application email\",
-    \"phone\": \"contact phone\",
-    \"address\": \"postal address\"
+    \"phone\": \"contact phone numbers\",
+    \"email\": \"contact email\",
+    \"address\": \"physical address\",
+    \"how_to_apply\": \"application instructions\"
   },
-  \"how_to_apply\": \"application instructions\"
+  \"salary\": \"any salary information\",
+  \"deadline\": \"application deadline\"
 }",
                 'messages' => [
                     ['role' => 'user', 'content' => $text],
@@ -388,6 +567,8 @@ Return ONLY a valid JSON object with these exact keys:
 
             if (!$claude->successful()) {
                 Log::error('Claude API error');
+                // Save raw message anyway
+                $this->saveRawJob($text, $contactInfo, $phone);
                 return;
             }
 
@@ -395,6 +576,7 @@ Return ONLY a valid JSON object with these exact keys:
 
             if (!$reply) {
                 Log::error('Claude returned empty response');
+                $this->saveRawJob($text, $contactInfo, $phone);
                 return;
             }
 
@@ -405,23 +587,46 @@ Return ONLY a valid JSON object with these exact keys:
 
             if (!$job || json_last_error() !== JSON_ERROR_NONE) {
                 Log::error('Failed to parse Claude response');
-                $this->saveDebugMessage($reply, $phone, 'claude_error');
+                $this->saveRawJob($text, $contactInfo, $phone);
                 return;
             }
 
-            // Add metadata
+            // Add metadata and extracted info
             $job['source_phone'] = $phone;
             $job['raw_text'] = $text;
             $job['parsed_at'] = now()->toDateTimeString();
             $job['message_id'] = $message['id'] ?? uniqid();
-            $job['extracted_phone'] = $contactPhone ?? null;
-            $job['extracted_email'] = $emailMatches[0] ?? null;
+            $job['extracted_contacts'] = $contactInfo;
+            $job['organizations_mentioned'] = array_unique($organizations) ?? [];
 
             $this->saveJobToFile($job);
 
         } catch (\Exception $e) {
             Log::error('Error in handleChannelJob: ' . $e->getMessage());
+            // Save raw message on error
+            if (isset($text)) {
+                $this->saveRawJob($text, [], $phone ?? 'unknown');
+            }
         }
+    }
+
+    /**
+     * Save raw job when parsing fails
+     */
+    private function saveRawJob(string $text, array $contactInfo, string $source): void
+    {
+        $rawJob = [
+            'raw_text' => $text,
+            'contact_info' => $contactInfo,
+            'source' => $source,
+            'received_at' => now()->toDateTimeString(),
+            'status' => 'unparsed'
+        ];
+
+        $filePath = $this->getUploadDir() . 'unparsed_jobs.json';
+        file_put_contents($filePath, json_encode($rawJob, JSON_PRETTY_PRINT) . "\n\n", FILE_APPEND | LOCK_EX);
+
+        Log::info('Saved unparsed job for review');
     }
 
     private function saveDebugMessage(string $content, string $phone, string $type): void
