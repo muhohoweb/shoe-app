@@ -66,6 +66,7 @@ Route::post('/mpesa/balance/callback', [MpesaController::class, 'balanceCallback
 Route::post('/mpesa/status/result', [MpesaController::class, 'transactionStatusResult']);
 Route::get('/mpesa/status/{identifier}', [MpesaController::class, 'checkStatus']);
 Route::get('/api/mpesa/balance', [MpesaController::class, 'getBalance']);
+Route::post('/whatsapp/test-job', [WhatsAppController::class, 'testJobPost']);
 
 
 require __DIR__ . '/settings.php';

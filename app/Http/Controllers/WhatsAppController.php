@@ -23,37 +23,69 @@ class WhatsAppController extends Controller
 
     public function webhook(Request $request)
     {
-        Log::info('Full webhook payload', $request->all());
+        // Log ALL incoming data for debugging
+        Log::info('========== WEBHOOK RECEIVED ==========');
+        Log::info('Method: ' . $request->method());
+        Log::info('Full payload:', $request->all());
 
         if ($request->isMethod('get')) {
-            return response()->json(['status' => 'ok']);
+            return response()->json(['status' => 'webhook_active']);
         }
 
         $event = $request->input('event');
+        $data = $request->input('data', []);
+
+        Log::info('Event type: ' . ($event ?? 'null'));
+        Log::info('Data structure:', $data);
+
+        // Log all possible message locations
+        if (isset($data['message'])) {
+            $message = $data['message'];
+            Log::info('Message keys:', array_keys($message));
+
+            if (isset($message['protocolMessage'])) {
+                Log::info('Protocol message type: ' . ($message['protocolMessage']['type'] ?? 'unknown'));
+            }
+
+            if (isset($message['conversation'])) {
+                Log::info('Conversation text: ' . $message['conversation']);
+            }
+
+            if (isset($message['extendedTextMessage'])) {
+                Log::info('Extended text message: ' . json_encode($message['extendedTextMessage']));
+            }
+        }
+
+        // Check if this is a forwarded message
+        $isForwarded = $this->isForwardedMessage($data['message'] ?? []);
+        Log::info('Is forwarded message: ' . ($isForwarded ? 'YES' : 'NO'));
+
         if ($event !== 'message_received') {
+            Log::info('Ignoring non-message event');
             return response()->json(['status' => 'ignored']);
         }
 
-        $from    = $request->input('data.from');
-        $message = $request->input('data.message');
+        $from    = $data['from'] ?? null;
+        $message = $data['message'] ?? [];
 
         if (!$from) {
+            Log::warning('No sender information in webhook');
             return response()->json(['status' => 'missing_data'], 400);
         }
 
         $phone = preg_replace('/@(s\.whatsapp\.net|lid)$/', '', $from);
+        Log::info('Processing message from: ' . $phone);
 
-        // Check for forwarded messages (potential job posts)
-        $isForwarded = $this->isForwardedMessage($message);
-
+        // Check for forwarded messages first
         if ($isForwarded) {
-            Log::info('Forwarded message detected', ['phone' => $phone]);
+            Log::info('✓ Forwarded message detected', ['phone' => $phone]);
             $this->handleChannelJob($message, $phone);
             return response()->json(['status' => 'forwarded_processed']);
         }
 
         // Ignore internal WhatsApp protocol messages
         if (isset($message['protocolMessage'])) {
+            Log::info('Ignoring protocol message: ' . ($message['protocolMessage']['type'] ?? 'unknown'));
             return response()->json(['status' => 'protocol_ignored']);
         }
 
@@ -61,20 +93,24 @@ class WhatsAppController extends Controller
         $mediaTypes = ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage'];
         foreach ($mediaTypes as $type) {
             if (isset($message[$type])) {
+                Log::info('Media message detected', ['type' => $type]);
                 $savedPath = $this->downloadAndSaveMedia($message[$type], $type);
                 Log::info('Media saved', ['path' => $savedPath, 'phone' => $phone]);
                 return response()->json(['status' => 'media_saved', 'file' => basename($savedPath ?? '')]);
             }
         }
 
-        // Text message handling (your existing chat logic)
+        // Regular text message handling
         $text = $message['conversation'] ?? $message['extendedTextMessage']['text'] ?? null;
 
         if (!$text) {
+            Log::info('No text content in message');
             return response()->json(['status' => 'no_text']);
         }
 
-        // Rest of your existing chat handling code...
+        Log::info('Processing text message: ' . substr($text, 0, 100));
+
+        // Your existing chat handling code here...
         $cacheKey = "whatsapp_chat_{$phone}";
         $history  = cache()->get($cacheKey, []);
         $history[] = ['role' => 'user', 'content' => $text];
@@ -102,7 +138,7 @@ class WhatsAppController extends Controller
             'anthropic-version' => '2023-06-01',
             'Content-Type'      => 'application/json',
         ])->post('https://api.anthropic.com/v1/messages', [
-            'model'      => 'claude-3-haiku-20240307', // Fixed model name
+            'model'      => 'claude-3-haiku-20240307',
             'max_tokens' => 500,
             'system'     => $systemPrompt,
             'messages'   => $history,
@@ -134,28 +170,70 @@ class WhatsAppController extends Controller
     }
 
     /**
+     * Test endpoint to simulate receiving a job post
+     */
+    public function testJobPost(Request $request)
+    {
+        Log::info('========== TEST JOB POST ==========');
+
+        $testMessage = $request->input('message', "We're hiring! Position: Senior Developer at Tech Company Kenya. Location: Nairobi. Requirements: 5+ years experience with PHP, Laravel. Send CV to hr@example.com");
+
+        // Create a mock forwarded message
+        $mockMessage = [
+            'extendedTextMessage' => [
+                'text' => $testMessage,
+                'contextInfo' => [
+                    'isForwarded' => true,
+                    'forwardingScore' => 1,
+                    'forwardOrigin' => ['type' => 'channel']
+                ]
+            ],
+            'id' => uniqid()
+        ];
+
+        $this->handleChannelJob($mockMessage, '254700000000');
+
+        return response()->json(['status' => 'test_completed', 'message' => 'Check logs and uploads/health_jobs.txt']);
+    }
+
+    /**
      * Check if a message is forwarded
      */
     private function isForwardedMessage(array $message): bool
     {
-        // Check extendedTextMessage
-        if (isset($message['extendedTextMessage']['contextInfo']['isForwarded']) &&
-            $message['extendedTextMessage']['contextInfo']['isForwarded'] === true) {
-            return true;
-        }
+        // Check all possible locations for forwarded flag
+        $forwardedLocations = [
+            'extendedTextMessage.contextInfo.isForwarded',
+            'contextInfo.isForwarded',
+            'imageMessage.contextInfo.isForwarded',
+            'videoMessage.contextInfo.isForwarded',
+            'documentMessage.contextInfo.isForwarded',
+            'audioMessage.contextInfo.isForwarded'
+        ];
 
-        // Check conversation level contextInfo
-        if (isset($message['contextInfo']['isForwarded']) &&
-            $message['contextInfo']['isForwarded'] === true) {
-            return true;
-        }
+        foreach ($forwardedLocations as $location) {
+            $keys = explode('.', $location);
+            $value = $message;
 
-        // Check for forwarded flag in other message types
-        foreach (['imageMessage', 'videoMessage', 'documentMessage'] as $type) {
-            if (isset($message[$type]['contextInfo']['isForwarded']) &&
-                $message[$type]['contextInfo']['isForwarded'] === true) {
+            foreach ($keys as $key) {
+                if (!isset($value[$key])) {
+                    $value = null;
+                    break;
+                }
+                $value = $value[$key];
+            }
+
+            if ($value === true || $value === 1 || $value === 'true') {
+                Log::info('Found forwarded flag at: ' . $location);
                 return true;
             }
+        }
+
+        // Also check for forwardOrigin which indicates forwarded message
+        if (isset($message['extendedTextMessage']['contextInfo']['forwardOrigin']) ||
+            isset($message['contextInfo']['forwardOrigin'])) {
+            Log::info('Found forwardOrigin in message');
+            return true;
         }
 
         return false;
@@ -166,25 +244,31 @@ class WhatsAppController extends Controller
      */
     private function extractMessageText(array $message): ?string
     {
-        // Try various places where text might be
-        if (isset($message['conversation'])) {
-            return $message['conversation'];
-        }
+        $textLocations = [
+            'conversation',
+            'extendedTextMessage.text',
+            'imageMessage.caption',
+            'videoMessage.caption',
+            'documentMessage.caption',
+            'audioMessage.caption'
+        ];
 
-        if (isset($message['extendedTextMessage']['text'])) {
-            return $message['extendedTextMessage']['text'];
-        }
+        foreach ($textLocations as $location) {
+            $keys = explode('.', $location);
+            $value = $message;
 
-        if (isset($message['imageMessage']['caption'])) {
-            return $message['imageMessage']['caption'];
-        }
+            foreach ($keys as $key) {
+                if (!isset($value[$key])) {
+                    $value = null;
+                    break;
+                }
+                $value = $value[$key];
+            }
 
-        if (isset($message['videoMessage']['caption'])) {
-            return $message['videoMessage']['caption'];
-        }
-
-        if (isset($message['documentMessage']['caption'])) {
-            return $message['documentMessage']['caption'];
+            if ($value && is_string($value) && strlen(trim($value)) > 0) {
+                Log::info('Found text at: ' . $location);
+                return trim($value);
+            }
         }
 
         return null;
@@ -193,49 +277,57 @@ class WhatsAppController extends Controller
     public function handleChannelJob(array $message, string $phone): void
     {
         try {
+            Log::info('========== HANDLE CHANNEL JOB ==========');
+            Log::info('Phone: ' . $phone);
+            Log::info('Full message structure:', $message);
+
             // Extract text from message
             $text = $this->extractMessageText($message);
 
-            // Log for debugging
-            Log::info('Processing channel message', [
-                'phone' => $phone,
-                'message_type' => array_keys($message)[0] ?? 'unknown',
-                'text_preview' => $text ? substr($text, 0, 100) . '...' : 'no text'
-            ]);
+            Log::info('Extracted text: ' . ($text ? substr($text, 0, 200) : 'NO TEXT FOUND'));
 
             if (!$text || strlen(trim($text)) < 20) {
-                Log::info('Message too short or empty, skipping', ['phone' => $phone]);
+                Log::info('Message too short or empty, skipping', ['length' => strlen(trim($text ?? ''))]);
                 return;
             }
 
-            // First, check if this looks like a job posting using simple keyword check
+            // Check if this looks like a job posting
             $jobKeywords = ['job', 'vacancy', 'hiring', 'position', 'career', 'opportunity',
-                'recruitment', 'work', 'employment', 'staff', 'need', 'looking for'];
+                'recruitment', 'work', 'employment', 'staff', 'need', 'looking for',
+                'we are hiring', 'job opening', 'job alert'];
 
             $lowerText = strtolower($text);
             $looksLikeJob = false;
+            $matchedKeywords = [];
 
             foreach ($jobKeywords as $keyword) {
                 if (str_contains($lowerText, $keyword)) {
                     $looksLikeJob = true;
-                    break;
+                    $matchedKeywords[] = $keyword;
                 }
             }
 
+            Log::info('Job keywords found: ' . json_encode($matchedKeywords));
+
             if (!$looksLikeJob) {
-                Log::info('Message does not appear to be a job posting', ['phone' => $phone]);
+                Log::info('Message does not appear to be a job posting');
+
+                // Save non-job messages for debugging
+                $this->saveDebugMessage($text, $phone, 'non_job');
                 return;
             }
 
-            // Send to Claude to parse into structured job data
-            Log::info('Sending to Claude for parsing', ['phone' => $phone]);
+            Log::info('✓ Message identified as potential job posting', ['phone' => $phone]);
+
+            // Send to Claude to parse
+            Log::info('Sending to Claude for parsing');
 
             $claude = Http::withHeaders([
                 'x-api-key' => config('services.anthropic.key'),
                 'anthropic-version' => '2023-06-01',
                 'Content-Type' => 'application/json',
             ])->post('https://api.anthropic.com/v1/messages', [
-                'model' => 'claude-3-haiku-20240307', // Fixed model name
+                'model' => 'claude-3-haiku-20240307',
                 'max_tokens' => 1000,
                 'system' => "You are a job listing parser. Extract job details from the provided text. 
 Return ONLY a valid JSON object with these exact keys (use null for unknown values):
@@ -267,13 +359,14 @@ Return ONLY a valid JSON object with these exact keys (use null for unknown valu
             }
 
             $reply = $claude->json()['content'][0]['text'] ?? null;
+            Log::info('Claude response received', ['response' => substr($reply ?? 'null', 0, 200)]);
 
             if (!$reply) {
                 Log::error('Claude returned empty response for job parsing');
                 return;
             }
 
-            // Clean the response (remove markdown code blocks if present)
+            // Clean the response
             $reply = preg_replace('/```json\s*|\s*```/', '', $reply);
             $reply = trim($reply);
 
@@ -284,6 +377,9 @@ Return ONLY a valid JSON object with these exact keys (use null for unknown valu
                     'response' => $reply,
                     'json_error' => json_last_error_msg()
                 ]);
+
+                // Save raw response for debugging
+                $this->saveDebugMessage($reply, $phone, 'claude_error');
                 return;
             }
 
@@ -293,14 +389,13 @@ Return ONLY a valid JSON object with these exact keys (use null for unknown valu
             $job['parsed_at'] = now()->toDateTimeString();
             $job['message_id'] = $message['id'] ?? uniqid();
 
-            // Log the parsed job
-            Log::info('Job parsed successfully', [
+            Log::info('✓ Job parsed successfully', [
                 'title' => $job['title'] ?? 'Unknown',
                 'location' => $job['location'] ?? 'Unknown',
                 'company' => $job['company'] ?? 'Unknown'
             ]);
 
-            // Save to text file with better formatting
+            // Save to files
             $this->saveJobToFile($job);
 
         } catch (\Exception $e) {
@@ -312,63 +407,90 @@ Return ONLY a valid JSON object with these exact keys (use null for unknown valu
     }
 
     /**
+     * Save debug messages for analysis
+     */
+    private function saveDebugMessage(string $content, string $phone, string $type): void
+    {
+        $debugPath = $this->getUploadDir() . 'debug_messages.txt';
+        $entry = "=== " . now()->format('Y-m-d H:i:s') . " ===\n";
+        $entry .= "Type: {$type}\n";
+        $entry .= "Phone: {$phone}\n";
+        $entry .= "Content:\n{$content}\n";
+        $entry .= str_repeat('=', 50) . "\n\n";
+
+        file_put_contents($debugPath, $entry, FILE_APPEND | LOCK_EX);
+        Log::info("Debug message saved: {$type}");
+    }
+
+    /**
      * Save job data to file with proper formatting
      */
     private function saveJobToFile(array $job): void
     {
         $filePath = $this->getUploadDir() . 'health_jobs.txt';
+        $jsonPath = $this->getUploadDir() . 'health_jobs.json';
 
-        // Create a nicely formatted entry
+        Log::info('Saving job to: ' . $filePath);
+
+        // Create formatted entry
         $entry = str_repeat('=', 80) . "\n";
         $entry .= "DATE: " . now()->format('Y-m-d H:i:s') . "\n";
+        $entry .= "MESSAGE ID: " . ($job['message_id'] ?? 'N/A') . "\n";
         $entry .= str_repeat('-', 80) . "\n";
         $entry .= "TITLE: " . ($job['title'] ?? 'N/A') . "\n";
         $entry .= "COMPANY: " . ($job['company'] ?? 'N/A') . "\n";
         $entry .= "LOCATION: " . ($job['location'] ?? 'N/A') . "\n";
-        $entry .= "TYPE: " . ($job['job_type'] ?? 'N/A') . "\n";
+        $entry .= "JOB TYPE: " . ($job['job_type'] ?? 'N/A') . "\n";
         $entry .= "EXPERIENCE: " . ($job['experience_level'] ?? 'N/A') . "\n";
 
-        if (isset($job['salary_min']) && isset($job['salary_max'])) {
+        if (isset($job['salary_min']) && isset($job['salary_max']) && $job['salary_min'] && $job['salary_max']) {
             $entry .= "SALARY: {$job['salary_min']} - {$job['salary_max']}\n";
+        }
+
+        if (!empty($job['contact_info'])) {
+            $entry .= "CONTACT: {$job['contact_info']}\n";
+        }
+
+        if (!empty($job['application_deadline'])) {
+            $entry .= "DEADLINE: {$job['application_deadline']}\n";
         }
 
         $entry .= str_repeat('-', 80) . "\n";
         $entry .= "DESCRIPTION:\n" . ($job['description'] ?? 'N/A') . "\n";
 
-        if (!empty($job['qualifications'])) {
+        if (!empty($job['qualifications']) && is_array($job['qualifications'])) {
             $entry .= str_repeat('-', 80) . "\n";
             $entry .= "QUALIFICATIONS:\n";
             foreach ($job['qualifications'] as $qual) {
-                $entry .= "- {$qual}\n";
+                $entry .= "• {$qual}\n";
             }
         }
 
-        if (!empty($job['requirements'])) {
+        if (!empty($job['requirements']) && is_array($job['requirements'])) {
             $entry .= str_repeat('-', 80) . "\n";
             $entry .= "REQUIREMENTS:\n";
             foreach ($job['requirements'] as $req) {
-                $entry .= "- {$req}\n";
+                $entry .= "• {$req}\n";
             }
         }
 
         $entry .= str_repeat('-', 80) . "\n";
-        $entry .= "CONTACT: " . ($job['contact_info'] ?? 'N/A') . "\n";
-        $entry .= "DEADLINE: " . ($job['application_deadline'] ?? 'N/A') . "\n";
-        $entry .= str_repeat('-', 80) . "\n";
         $entry .= "SOURCE PHONE: " . ($job['source_phone'] ?? 'N/A') . "\n";
+        $entry .= "RAW TEXT:\n" . ($job['raw_text'] ?? 'N/A') . "\n";
         $entry .= str_repeat('=', 80) . "\n\n";
 
-        // Append to file
+        // Append to text file
         file_put_contents($filePath, $entry, FILE_APPEND | LOCK_EX);
 
-        // Also save as JSON for easy processing
-        $jsonPath = $this->getUploadDir() . 'health_jobs.json';
-        $jsonEntry = json_encode($job, JSON_PRETTY_PRINT) . "\n\n";
+        // Also save as JSON
+        $jsonEntry = json_encode($job, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n\n";
         file_put_contents($jsonPath, $jsonEntry, FILE_APPEND | LOCK_EX);
 
-        Log::info('Job saved to files', [
+        Log::info('✓ Job saved successfully', [
             'text_file' => $filePath,
-            'json_file' => $jsonPath
+            'json_file' => $jsonPath,
+            'file_exists' => file_exists($filePath) ? 'YES' : 'NO',
+            'file_size' => file_exists($filePath) ? filesize($filePath) : 0
         ]);
     }
 
@@ -447,6 +569,22 @@ Return ONLY a valid JSON object with these exact keys (use null for unknown valu
             Log::error('downloadAndSaveMedia exception: ' . $e->getMessage());
             return null;
         }
+    }
+
+    /** @deprecated Use sendWhatsAppMessage() with FlareSend instead */
+    public function sendOldWhatsAppMessage(Request $request): bool
+    {
+        $request->validate([
+            'phone' => 'required|string',
+            'message' => 'required|string',
+        ]);
+
+        $response = Http::post(config('services.whats_app_service.key'), [
+            'phone' => $request->phone,
+            'message' => $request->message,
+        ]);
+
+        return $response->successful();
     }
 
     public function sendWhatsAppMessage(Request $request): bool
