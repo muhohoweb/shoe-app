@@ -8,6 +8,15 @@ use Illuminate\Support\Facades\Log;
 
 class WhatsAppController extends Controller
 {
+    // Add this method:
+    private function getUploadDir(): string
+    {
+        $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? base_path('public');
+        return rtrim($docRoot, '/') . '/uploads/';
+    }
+
+
+
     public function webhook(Request $request)
     {
         Log::info('Full webhook payload', $request->all());
@@ -22,20 +31,34 @@ class WhatsAppController extends Controller
         }
 
         $from = $request->input('data.from');
-        $message = $request->input('data.message.conversation');
+        $message = $request->input('data.message');
 
-        if (!$from || !$message) {
+        if (!$from) {
             return response()->json(['status' => 'missing_data'], 400);
         }
 
         $phone = preg_replace('/@(s\.whatsapp\.net|lid)$/', '', $from);
 
-        // Load conversation history
+        // Handle media messages
+        $mediaTypes = ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage'];
+        foreach ($mediaTypes as $type) {
+            if (isset($message[$type])) {
+                $savedPath = $this->downloadAndSaveMedia($message[$type], $type);
+                Log::info('Media saved', ['path' => $savedPath, 'phone' => $phone]);
+                return response()->json(['status' => 'media_saved', 'file' => basename($savedPath ?? '')]);
+            }
+        }
+
+        // Text message handling
+        $text = $message['conversation'] ?? null;
+
+        if (!$text) {
+            return response()->json(['status' => 'no_text']);
+        }
+
         $cacheKey = "whatsapp_chat_{$phone}";
         $history = cache()->get($cacheKey, []);
-
-        // Add client message to history
-        $history[] = ['role' => 'user', 'content' => $message];
+        $history[] = ['role' => 'user', 'content' => $text];
 
         $services = (new DentalService())->getServices();
 
@@ -68,27 +91,18 @@ class WhatsAppController extends Controller
 
         $reply = $claude->json()['content'][0]['text'] ?? '';
 
-        // Add Claude reply to history
         $history[] = ['role' => 'assistant', 'content' => $reply];
-
-        // Save history for 30 minutes
         cache()->put($cacheKey, $history, now()->addMinutes(30));
 
-        // Check if Claude has collected all details
         $cleaned = preg_replace('/```json|```/', '', $reply);
         $order = json_decode(trim($cleaned), true);
 
         if (isset($order['order_ready']) && $order['order_ready'] === true) {
-            // Place the order
             $order['client_phone'] = $phone;
             Http::post('https://drmorch.medicareers.co.ke/dental/services/order', $order);
-
-            // Clear conversation
             cache()->forget($cacheKey);
-
             $replyMessage = "Order confirmed!\n{$order['service_name']}\nPrice: Ksh " . ($order['price'] * 130) . "\nEstimated delivery: {$order['estimated_days']} days.\nWe will notify you when it is ready!";
         } else {
-            // Send Claude's question back to client
             $replyMessage = $reply;
         }
 
@@ -98,6 +112,84 @@ class WhatsAppController extends Controller
         ]));
 
         return response()->json(['status' => 'received']);
+    }
+
+    private function downloadAndSaveMedia(array $media, string $type): ?string
+    {
+        try {
+            $url      = $media['url'] ?? null;
+            $mediaKey = isset($media['mediaKey']) ? base64_decode($media['mediaKey']) : null;
+
+            if (!$url || !$mediaKey) {
+                Log::error('Missing url or mediaKey', ['type' => $type]);
+                return null;
+            }
+
+            // HKDF expand: derive 112 bytes from mediaKey
+            $mediaTypeLabel = match(true) {
+                str_contains($type, 'image')    => 'WhatsApp Image Keys',
+                str_contains($type, 'video')    => 'WhatsApp Video Keys',
+                str_contains($type, 'audio')    => 'WhatsApp Audio Keys',
+                default                         => 'WhatsApp Document Keys',
+            };
+
+            $expanded  = hash_hkdf('sha256', $mediaKey, 112, $mediaTypeLabel);
+            $iv        = substr($expanded, 0, 16);
+            $cipherKey = substr($expanded, 16, 32);
+
+            // Download encrypted file
+            $encrypted = Http::timeout(30)->get($url)->body();
+
+            if (empty($encrypted)) {
+                Log::error('Empty response when downloading media', ['url' => $url]);
+                return null;
+            }
+
+            // Strip last 10 bytes (MAC tag) then decrypt
+            $ciphertext = substr($encrypted, 0, -10);
+            $decrypted  = openssl_decrypt($ciphertext, 'aes-256-cbc', $cipherKey, OPENSSL_RAW_DATA, $iv);
+
+            if ($decrypted === false) {
+                Log::error('Media decryption failed', ['type' => $type]);
+                return null;
+            }
+
+            // Derive file extension from mimetype
+            // With this:
+            $mime = $media['mimetype'] ?? 'application/octet-stream';
+            $ext  = match(true) {
+                str_contains($mime, 'jpeg')       => 'jpg',
+                str_contains($mime, 'png')        => 'png',
+                str_contains($mime, 'gif')        => 'gif',
+                str_contains($mime, 'webp')       => 'webp',
+                str_contains($mime, 'mp4')        => 'mp4',
+                str_contains($mime, 'mpeg')       => 'mp3',
+                str_contains($mime, 'ogg')        => 'ogg',
+                str_contains($mime, 'webm')       => 'webm',
+                str_contains($mime, 'pdf')        => 'pdf',
+                str_contains($mime, 'msword')     => 'doc',
+                str_contains($mime, 'wordprocessingml') => 'docx',
+                str_contains($mime, 'spreadsheetml')    => 'xlsx',
+                str_contains($mime, 'presentationml')   => 'pptx',
+                str_contains($mime, 'zip')        => 'zip',
+                str_contains($mime, 'stl')            => 'stl',
+                str_contains($mime, 'sla')            => 'stl', // some tools send this mime
+                default                           => last(explode('/', $mime)) // fallback to whatever is after '/'
+            };
+
+            $filename = uniqid('wa_', true) . '.' . $ext;
+            $fullPath = $this->getUploadDir() . $filename;
+
+            file_put_contents($fullPath, $decrypted);
+
+            Log::info('Media file saved', ['file' => $filename, 'size' => strlen($decrypted)]);
+
+            return $fullPath;
+
+        } catch (\Exception $e) {
+            Log::error('downloadAndSaveMedia exception: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /** @deprecated Use sendWhatsAppMessage() with FlareSend instead */
@@ -143,12 +235,12 @@ class WhatsAppController extends Controller
              Status  : {$response->status()}
              Response: " . json_encode($response->json(), JSON_PRETTY_PRINT) . "
             ========================================
-                    ");
+            ");
 
-                        return $response->successful();
+            return $response->successful();
 
-                    } catch (\Exception $e) {
-                        Log::error("
+        } catch (\Exception $e) {
+            Log::error("
             ========================================
              WHATSAPP MESSAGE | ERROR
             ========================================
@@ -156,7 +248,7 @@ class WhatsAppController extends Controller
              Message : {$request->message}
              Error   : {$e->getMessage()}
             ========================================
-        ");
+            ");
             return false;
         }
     }
