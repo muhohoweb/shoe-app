@@ -15,8 +15,6 @@ class WhatsAppController extends Controller
         return rtrim($docRoot, '/') . '/uploads/';
     }
 
-
-
     public function webhook(Request $request)
     {
         Log::info('Full webhook payload', $request->all());
@@ -38,6 +36,15 @@ class WhatsAppController extends Controller
         }
 
         $phone = preg_replace('/@(s\.whatsapp\.net|lid)$/', '', $from);
+
+        // Detect forwarded channel messages (job adverts)
+        $isForwarded = isset($message['extendedTextMessage']['contextInfo']['isForwarded']);
+        $hasChannelInfo = isset($message['extendedTextMessage']['contextInfo']['forwardOrigin']);
+
+        if ($isForwarded && $hasChannelInfo) {
+            $this->handleChannelJob($message, $phone);
+            return response()->json(['status' => 'job_processed']);
+        }
 
         // Handle media messages
         $mediaTypes = ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage'];
@@ -63,20 +70,20 @@ class WhatsAppController extends Controller
         $services = (new DentalService())->getServices();
 
         $systemPrompt = "You are a dental lab assistant for Digital Art Dental Studios. 
-        Your job is to collect order details from clients via WhatsApp before placing an order.
-        
-        Available services: " . json_encode($services) . "
-        
-        Follow these steps:
-        1. Greet the client and identify the service they need
-        2. Ask for tooth number if not provided
-        3. Ask for shade if relevant (crowns, veneers)
-        4. Confirm all details with the client
-        5. Once confirmed, respond ONLY with this JSON (no other text):
-        {\"order_ready\":true,\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}
-        
-        Currency is Kenyan Shillings (Ksh). Do NOT use markdown formatting like ** or * in your responses. Use plain text only.
-        Until you have all details, respond conversationally in plain text.";
+    Your job is to collect order details from clients via WhatsApp before placing an order.
+    
+    Available services: " . json_encode($services) . "
+    
+    Follow these steps:
+    1. Greet the client and identify the service they need
+    2. Ask for tooth number if not provided
+    3. Ask for shade if relevant (crowns, veneers)
+    4. Confirm all details with the client
+    5. Once confirmed, respond ONLY with this JSON (no other text):
+    {\"order_ready\":true,\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}
+    
+    Currency is Kenyan Shillings (Ksh). Do NOT use markdown formatting like ** or * in your responses. Use plain text only.
+    Until you have all details, respond conversationally in plain text.";
 
         $claude = Http::withHeaders([
             'x-api-key' => config('services.anthropic.key'),
@@ -114,10 +121,75 @@ class WhatsAppController extends Controller
         return response()->json(['status' => 'received']);
     }
 
+    public function handleChannelJob(array $message, string $phone): void
+    {
+        // Extract text from channel/forwarded message
+        $text = $message['extendedTextMessage']['text']
+            ?? $message['conversation']
+            ?? null;
+
+        if (!$text) {
+            Log::info('Channel message has no text, skipping');
+            return;
+        }
+
+        // Send to Claude to parse into structured job data
+        $claude = Http::withHeaders([
+            'x-api-key' => config('services.anthropic.key'),
+            'anthropic-version' => '2023-06-01',
+            'Content-Type' => 'application/json',
+        ])->post('https://api.anthropic.com/v1/messages', [
+            'model' => 'claude-haiku-4-5-20251001',
+            'max_tokens' => 800,
+            'system' => 'You are a job listing parser. Extract job details from the provided text and return ONLY a JSON object with these exact keys:
+            {
+              "title": "job title or null",
+              "description": "full job description as plain text or null",
+              "location": "city or region or null",
+              "job_type": "full-time or part-time or contract or null",
+              "salary_min": numeric value only or null,
+              "salary_max": numeric value only or null,
+              "experience_level": "entry or mid or senior or null",
+              "qualifications": ["array", "of", "qualifications"] or null,
+              "requirements": ["array", "of", "requirements"] or null
+            }
+            Return null for any field you cannot determine. No markdown, no extra text.',
+            'messages' => [
+                ['role' => 'user', 'content' => $text],
+            ],
+        ]);
+
+        $reply = $claude->json()['content'][0]['text'] ?? null;
+
+        if (!$reply) {
+            Log::error('Claude returned empty response for job parsing');
+            return;
+        }
+
+        $job = json_decode(trim($reply), true);
+
+        if (!$job || !isset($job['title'])) {
+            Log::info('Could not parse job from message', ['raw' => $text]);
+            return;
+        }
+
+        // Add metadata
+        $job['source_phone'] = $phone;
+        $job['raw_text'] = $text;
+        $job['parsed_at'] = now()->toDateTimeString();
+
+        // Save to text file (one JSON per line for easy reading later)
+        $filePath = $this->getUploadDir() . 'health_jobs.txt';
+        $line = json_encode($job, JSON_PRETTY_PRINT) . "\n---\n";
+        file_put_contents($filePath, $line, FILE_APPEND | LOCK_EX);
+
+        Log::info('Job saved to file', ['title' => $job['title'], 'location' => $job['location']]);
+    }
+
     private function downloadAndSaveMedia(array $media, string $type): ?string
     {
         try {
-            $url      = $media['url'] ?? null;
+            $url = $media['url'] ?? null;
             $mediaKey = isset($media['mediaKey']) ? base64_decode($media['mediaKey']) : null;
 
             if (!$url || !$mediaKey) {
@@ -126,15 +198,15 @@ class WhatsAppController extends Controller
             }
 
             // HKDF expand: derive 112 bytes from mediaKey
-            $mediaTypeLabel = match(true) {
-                str_contains($type, 'image')    => 'WhatsApp Image Keys',
-                str_contains($type, 'video')    => 'WhatsApp Video Keys',
-                str_contains($type, 'audio')    => 'WhatsApp Audio Keys',
-                default                         => 'WhatsApp Document Keys',
+            $mediaTypeLabel = match (true) {
+                str_contains($type, 'image') => 'WhatsApp Image Keys',
+                str_contains($type, 'video') => 'WhatsApp Video Keys',
+                str_contains($type, 'audio') => 'WhatsApp Audio Keys',
+                default => 'WhatsApp Document Keys',
             };
 
-            $expanded  = hash_hkdf('sha256', $mediaKey, 112, $mediaTypeLabel);
-            $iv        = substr($expanded, 0, 16);
+            $expanded = hash_hkdf('sha256', $mediaKey, 112, $mediaTypeLabel);
+            $iv = substr($expanded, 0, 16);
             $cipherKey = substr($expanded, 16, 32);
 
             // Download encrypted file
@@ -147,7 +219,7 @@ class WhatsAppController extends Controller
 
             // Strip last 10 bytes (MAC tag) then decrypt
             $ciphertext = substr($encrypted, 0, -10);
-            $decrypted  = openssl_decrypt($ciphertext, 'aes-256-cbc', $cipherKey, OPENSSL_RAW_DATA, $iv);
+            $decrypted = openssl_decrypt($ciphertext, 'aes-256-cbc', $cipherKey, OPENSSL_RAW_DATA, $iv);
 
             if ($decrypted === false) {
                 Log::error('Media decryption failed', ['type' => $type]);
@@ -157,24 +229,24 @@ class WhatsAppController extends Controller
             // Derive file extension from mimetype
             // With this:
             $mime = $media['mimetype'] ?? 'application/octet-stream';
-            $ext  = match(true) {
-                str_contains($mime, 'jpeg')       => 'jpg',
-                str_contains($mime, 'png')        => 'png',
-                str_contains($mime, 'gif')        => 'gif',
-                str_contains($mime, 'webp')       => 'webp',
-                str_contains($mime, 'mp4')        => 'mp4',
-                str_contains($mime, 'mpeg')       => 'mp3',
-                str_contains($mime, 'ogg')        => 'ogg',
-                str_contains($mime, 'webm')       => 'webm',
-                str_contains($mime, 'pdf')        => 'pdf',
-                str_contains($mime, 'msword')     => 'doc',
+            $ext = match (true) {
+                str_contains($mime, 'jpeg') => 'jpg',
+                str_contains($mime, 'png') => 'png',
+                str_contains($mime, 'gif') => 'gif',
+                str_contains($mime, 'webp') => 'webp',
+                str_contains($mime, 'mp4') => 'mp4',
+                str_contains($mime, 'mpeg') => 'mp3',
+                str_contains($mime, 'ogg') => 'ogg',
+                str_contains($mime, 'webm') => 'webm',
+                str_contains($mime, 'pdf') => 'pdf',
+                str_contains($mime, 'msword') => 'doc',
                 str_contains($mime, 'wordprocessingml') => 'docx',
-                str_contains($mime, 'spreadsheetml')    => 'xlsx',
-                str_contains($mime, 'presentationml')   => 'pptx',
-                str_contains($mime, 'zip')        => 'zip',
-                str_contains($mime, 'stl')            => 'stl',
-                str_contains($mime, 'sla')            => 'stl', // some tools send this mime
-                default                           => last(explode('/', $mime)) // fallback to whatever is after '/'
+                str_contains($mime, 'spreadsheetml') => 'xlsx',
+                str_contains($mime, 'presentationml') => 'pptx',
+                str_contains($mime, 'zip') => 'zip',
+                str_contains($mime, 'stl') => 'stl',
+                str_contains($mime, 'sla') => 'stl', // some tools send this mime
+                default => last(explode('/', $mime)) // fallback to whatever is after '/'
             };
 
             $filename = uniqid('wa_', true) . '.' . $ext;
