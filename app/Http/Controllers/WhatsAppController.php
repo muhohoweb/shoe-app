@@ -100,7 +100,7 @@ class WhatsAppController extends Controller
             'doctor', 'nurse', 'clinical', 'medical', 'hospital', 'clinic',
             'pharmacist', 'radiologist', 'physiotherapist', 'intern', 'pre intern',
             'dispensing', 'drugs', 'procedures', 'clerking', 'labs', 'interpretation',
-            'adventist hospital', 'knh', 'kenyatta', 'mbagathi'
+            'adventist hospital', 'knh', 'kenyatta', 'mbagathi,pre intern', 'internship', 'dispensing', 'clerking', 'labs', 'eliox', 'medical clinic'
         ];
 
         // Application related
