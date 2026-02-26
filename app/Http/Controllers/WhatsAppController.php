@@ -8,6 +8,28 @@ use Illuminate\Support\Facades\Log;
 
 class WhatsAppController extends Controller
 {
+    private function isEventPosting(string $text): bool
+    {
+        $text = strtolower($text);
+
+        $eventIndicators = [
+            'webinar', 'seminar', 'conference', 'workshop', 'training',
+            'cme', 'grand round', 'symposium', 'forum', 'summit',
+            'zoom', 'register', 'registration', 'join', 'attend',
+            'date:', 'time:', 'venue:', 'topic:', 'speaker:',
+            'certificate', 'free', 'online', 'virtual', 'meeting id'
+        ];
+
+        $score = 0;
+        foreach ($eventIndicators as $indicator) {
+            if (str_contains($text, $indicator)) {
+                $score++;
+            }
+        }
+
+        Log::info('Event posting score: ' . $score . ' for text: ' . substr($text, 0, 50));
+        return $score >= 3;
+    }
     private function getUploadDir(): string
     {
         $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? base_path('public');
@@ -22,7 +44,6 @@ class WhatsAppController extends Controller
 
     public function webhook(Request $request)
     {
-        // Log everything for debugging
         Log::info('========== WEBHOOK RECEIVED ==========');
         Log::info('Full payload:', $request->all());
 
@@ -30,58 +51,120 @@ class WhatsAppController extends Controller
             return response()->json(['status' => 'webhook_active']);
         }
 
-        $event = $request->input('event');
         $data = $request->input('data', []);
+
         if (isset($data['message']['protocolMessage'])) {
             return response()->json(['status' => 'protocol_ignored']);
         }
 
-        // Extract ANY content from the message regardless of structure
         $extractedData = $this->extractAnyContent($data);
 
         Log::info('Extracted data:', $extractedData);
 
-        // If we have any text content, process it
         if (!empty($extractedData['text'])) {
             $text = $extractedData['text'];
 
-            // STEP 1: Check if it's a job posting (using enhanced detection)
+            // STEP 1: Job posting
             if ($this->isJobPosting($text)) {
                 Log::info('✓ Message identified as JOB POSTING');
 
-                // Extract phone from message if present
-                $contactPhone = null;
                 preg_match('/(?:\+?254|0)[7-9][0-9]{8}/', $text, $phoneMatches);
-                if (!empty($phoneMatches)) {
-                    $contactPhone = $phoneMatches[0];
-                    Log::info('Found contact phone in message: ' . $contactPhone);
-                }
+                $contactPhone = $phoneMatches[0] ?? null;
+                if ($contactPhone) Log::info('Found contact phone in message: ' . $contactPhone);
 
-                // Create a message structure for handleChannelJob
                 $jobMessage = [
                     'conversation' => $text,
-                    'id' => $extractedData['message_id'] ?? uniqid()
+                    'id'           => $extractedData['message_id'] ?? uniqid(),
                 ];
 
-                // Use the contact phone if found, otherwise use 'channel'
-                $sourcePhone = $contactPhone ?: 'whatsapp_channel';
-
-                $this->handleChannelJob($jobMessage, $sourcePhone);
+                $this->handleChannelJob($jobMessage, $contactPhone ?: 'whatsapp_channel');
                 return response()->json(['status' => 'job_processed']);
             }
 
-            // STEP 2: If not a job, but has sender, process as regular message
+            // STEP 2: Event posting
+            if ($this->isEventPosting($text)) {
+                Log::info('✓ Message identified as EVENT');
+                $imageData = $data['message']['imageMessage'] ?? null;
+                $this->handleChannelEvent($text, $imageData, $extractedData['message_id'] ?? uniqid());
+                return response()->json(['status' => 'event_processed']);
+            }
+
+            // STEP 3: Regular message with known sender
             if (!empty($extractedData['sender'])) {
                 Log::info('Processing as regular message with sender');
                 $this->processRegularMessage($extractedData);
             } else {
-                // STEP 3: No sender and not a job - save for review
-                Log::info('No sender and not clearly a job - saving for review');
+                Log::info('No sender and not clearly a job or event - saving for review');
                 $this->saveDebugMessage($text, 'unknown', 'needs_review');
             }
         }
 
         return response()->json(['status' => 'processed']);
+    }
+
+    public function handleChannelEvent(string $text, ?array $imageData, string $messageId): void
+    {
+        try {
+            Log::info('========== HANDLE CHANNEL EVENT ==========');
+
+            // Parse event details with Claude
+            $claude = Http::withHeaders([
+                'x-api-key'         => config('services.anthropic.key'),
+                'anthropic-version' => '2023-06-01',
+                'Content-Type'      => 'application/json',
+            ])->post('https://api.anthropic.com/v1/messages', [
+                'model'      => 'claude-haiku-4-5-20251001',
+                'max_tokens' => 800,
+                'system'     => 'You are an event details parser. Extract event details from the text.
+            Return ONLY a JSON object with these exact keys:
+            {
+              "title": "event title",
+              "description": "full description as plain text",
+              "start_date": "YYYY-MM-DD HH:MM:SS or null",
+              "end_date": "YYYY-MM-DD HH:MM:SS or null",
+              "link": "registration or zoom link or null"
+            }
+            For dates, infer the year from context if not explicitly stated.
+            Return null for any field you cannot determine. No markdown, no extra text.',
+                'messages' => [
+                    ['role' => 'user', 'content' => $text],
+                ],
+            ]);
+
+            $reply = $claude->json()['content'][0]['text'] ?? null;
+
+            if (!$reply) {
+                Log::error('Claude returned empty response for event');
+                return;
+            }
+
+            $event = json_decode(trim(preg_replace('/```json|```/', '', $reply)), true);
+
+            if (!$event || !isset($event['title'])) {
+                Log::error('Failed to parse event from Claude response', ['raw' => $reply]);
+                return;
+            }
+
+            Log::info('Event parsed', ['title' => $event['title'], 'start' => $event['start_date']]);
+
+            // Attach image keys if present so medicareers can decrypt and store the image
+            $payload = $event;
+            if ($imageData) {
+                $payload['image_url'] = $imageData['url']      ?? null;
+                $payload['media_key'] = $imageData['mediaKey'] ?? null;
+            }
+
+            $response = Http::post('https://medicareers.co.ke/whats-app-events', $payload);
+
+            Log::info('Posted event to medicareers', [
+                'title'  => $event['title'],
+                'status' => $response->status(),
+                'body'   => $response->body(),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('handleChannelEvent error: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -286,7 +369,7 @@ class WhatsAppController extends Controller
             'anthropic-version' => '2023-06-01',
             'Content-Type' => 'application/json',
         ])->post('https://api.anthropic.com/v1/messages', [
-            'model' => 'claude-3-haiku-20240307',
+            'model' => 'claude-haiku-4-5-20251001',
             'max_tokens' => 500,
             'system' => $systemPrompt,
             'messages' => $history,
