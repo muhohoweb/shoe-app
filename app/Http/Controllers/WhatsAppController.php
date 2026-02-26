@@ -32,6 +32,9 @@ class WhatsAppController extends Controller
 
         $event = $request->input('event');
         $data = $request->input('data', []);
+        if (isset($data['message']['protocolMessage'])) {
+            return response()->json(['status' => 'protocol_ignored']);
+        }
 
         // Extract ANY content from the message regardless of structure
         $extractedData = $this->extractAnyContent($data);
@@ -519,8 +522,16 @@ class WhatsAppController extends Controller
             $job['extracted_contacts'] = $contactInfo;
             $job['organizations_mentioned'] = array_unique($organizations) ?? [];
 
-            Http::post('https://medicareers.co.ke/whats-app-jobs', $job);
+
             $this->saveJobToFile($job);
+
+            $response = Http::post('https://medicareers.co.ke/whats-app-jobs', $job);
+            Log::info('Posted to medicareers', [
+                'status' => $response->status(),
+                'body'   => $response->body(),
+            ]);
+
+
 
         } catch (\Exception $e) {
             Log::error('Error in handleChannelJob: ' . $e->getMessage());
