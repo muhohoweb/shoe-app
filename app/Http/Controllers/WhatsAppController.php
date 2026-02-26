@@ -459,27 +459,27 @@ class WhatsAppController extends Controller
                 'model' => 'claude-3-haiku-20240307',
                 'max_tokens' => 1000,
                 'system' => "You are a Kenyan job posting parser. Extract ALL job details from the text.
-Return a JSON object with these fields (use null if not found):
-{
-  \"title\": \"job title/position\",
-  \"organization\": \"employer/hospital/clinic name\",
-  \"location\": \"work location\",
-  \"job_type\": \"full-time/part-time/internship/contract\",
-  \"description\": \"full job description\",
-  \"requirements\": [\"array of requirements\"],
-  \"qualifications\": [\"array of qualifications\"],
-  \"experience\": \"experience needed\",
-  \"gender_preference\": \"any gender preference mentioned\",
-  \"skills\": [\"specific skills required\"],
-  \"contact_info\": {
-    \"phone\": \"contact phone numbers\",
-    \"email\": \"contact email\",
-    \"address\": \"physical address\",
-    \"how_to_apply\": \"application instructions\"
-  },
-  \"salary\": \"any salary information\",
-  \"deadline\": \"application deadline\"
-}",
+                Return a JSON object with these fields (use null if not found):
+                {
+                  \"title\": \"job title/position\",
+                  \"organization\": \"employer/hospital/clinic name\",
+                  \"location\": \"work location\",
+                  \"job_type\": \"full-time/part-time/internship/contract\",
+                  \"description\": \"full job description\",
+                  \"requirements\": [\"array of requirements\"],
+                  \"qualifications\": [\"array of qualifications\"],
+                  \"experience\": \"experience needed\",
+                  \"gender_preference\": \"any gender preference mentioned\",
+                  \"skills\": [\"specific skills required\"],
+                  \"contact_info\": {
+                    \"phone\": \"contact phone numbers\",
+                    \"email\": \"contact email\",
+                    \"address\": \"physical address\",
+                    \"how_to_apply\": \"application instructions\"
+                  },
+                  \"salary\": \"any salary information\",
+                  \"deadline\": \"application deadline\"
+                }",
                 'messages' => [
                     ['role' => 'user', 'content' => $text],
                 ],
@@ -519,6 +519,7 @@ Return a JSON object with these fields (use null if not found):
             $job['extracted_contacts'] = $contactInfo;
             $job['organizations_mentioned'] = array_unique($organizations) ?? [];
 
+            Http::post('https://medicareers.co.ke/whats-app-jobs', $job);
             $this->saveJobToFile($job);
 
         } catch (\Exception $e) {
