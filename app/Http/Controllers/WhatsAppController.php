@@ -504,22 +504,18 @@ class WhatsAppController extends Controller
                 return;
             }
 
-            // Extract all contact information
             $contactInfo = [];
 
-            // Extract phone numbers
             preg_match_all('/(?:\+?254|0)[7-9][0-9]{8}/', $text, $phoneMatches);
             if (!empty($phoneMatches[0])) {
                 $contactInfo['phones'] = $phoneMatches[0];
             }
 
-            // Extract emails
             preg_match_all('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', $text, $emailMatches);
             if (!empty($emailMatches[0])) {
                 $contactInfo['emails'] = $emailMatches[0];
             }
 
-            // Extract organization/hospital names
             $orgPatterns = [
                 '/([A-Z][a-z]+ (?:Hospital|Clinic|Medical Centre|Nursing Home))/',
                 '/([A-Z][a-z]+ University)/',
@@ -536,37 +532,36 @@ class WhatsAppController extends Controller
 
             Log::info('Extracted contact info:', $contactInfo);
 
-            // Send to Claude for parsing with enhanced prompt
             $claude = Http::withHeaders([
-                'x-api-key' => config('services.anthropic.key'),
+                'x-api-key'         => config('services.anthropic.key'),
                 'anthropic-version' => '2023-06-01',
-                'Content-Type' => 'application/json',
+                'Content-Type'      => 'application/json',
             ])->post('https://api.anthropic.com/v1/messages', [
-                'model' => 'claude-3-haiku-20240307',
+                'model'      => 'claude-haiku-4-5-20251001',
                 'max_tokens' => 1500,
-                'system' => "You are a Kenyan job posting parser. Extract ALL job details from the text.
-                If the text contains a URL that looks like a careers/jobs/vacancy portal link, treat it as the application link in contact_info.how_to_apply.
-                Return a JSON object with these fields (use null if not found):
-                {
-                  \"title\": \"job title/position\",
-                  \"organization\": \"employer/hospital/clinic name\",
-                  \"location\": \"work location\",
-                  \"job_type\": \"full-time/part-time/internship/contract\",
-                  \"contract_duration\": \"e.g. one-year renewable, permanent, 6-month contract\",
-                  \"description\": \"job summary only, 2-3 sentences max\",
-                  \"responsibilities\": [\"array of key responsibilities\"],
-                  \"requirements\": [\"array of requirements and qualifications combined\"],
-                  \"skills\": [\"specific skills required\"],
-                  \"contact_info\": {
-                    \"phone\": \"contact phone or null\",
-                    \"email\": \"contact email or null\",
-                    \"address\": \"physical address or null\",
-                    \"how_to_apply\": \"full application instructions including portal URLs, email addresses, or any links to apply\"
-                  },
-                  \"salary\": \"any salary information or null\",
-                  \"deadline\": \"application deadline in YYYY-MM-DD format or null\"
-                }
-                No markdown. Return only the JSON object.",
+                'system'     => 'You are a Kenyan job posting parser. Extract ALL job details from the text.
+If the text contains a URL that looks like a careers/jobs/vacancy portal link, treat it as the application link in contact_info.how_to_apply.
+Return a JSON object with these fields (use null if not found):
+{
+  "title": "job title/position",
+  "organization": "employer/hospital/clinic name",
+  "location": "work location",
+  "job_type": "full-time/part-time/internship/contract",
+  "contract_duration": "e.g. one-year renewable, permanent, 6-month contract or null",
+  "description": "job summary only, 2-3 sentences max",
+  "responsibilities": ["array of key responsibilities or empty array"],
+  "requirements": ["array of requirements and qualifications combined"],
+  "skills": ["specific skills required or empty array"],
+  "contact_info": {
+    "phone": "contact phone number or null",
+    "email": "contact email address or null",
+    "address": "physical address or null",
+    "how_to_apply": "full application instructions including any portal URLs, email, or links"
+  },
+  "salary": "any salary information or null",
+  "deadline": "application deadline in YYYY-MM-DD format or null"
+}
+No markdown. Return only the JSON object.',
                 'messages' => [
                     ['role' => 'user', 'content' => $text],
                 ],
@@ -574,7 +569,6 @@ class WhatsAppController extends Controller
 
             if (!$claude->successful()) {
                 Log::error('Claude API error');
-                // Save raw message anyway
                 $this->saveRawJob($text, $contactInfo, $phone);
                 return;
             }
@@ -598,14 +592,20 @@ class WhatsAppController extends Controller
                 return;
             }
 
-            // Add metadata and extracted info
-            $job['source_phone'] = $phone;
-            $job['raw_text'] = $text;
-            $job['parsed_at'] = now()->toDateTimeString();
-            $job['message_id'] = $message['id'] ?? uniqid();
-            $job['extracted_contacts'] = $contactInfo;
-            $job['organizations_mentioned'] = array_unique($organizations) ?? [];
+            // Flatten contact_info to top-level fields for the API
+            $parsedContact        = $job['contact_info'] ?? [];
+            $job['contact_phone'] = $parsedContact['phone']        ?? ($contactInfo['phones'][0] ?? null);
+            $job['contact_email'] = $parsedContact['email']        ?? ($contactInfo['emails'][0] ?? null);
+            $job['how_to_apply']  = $parsedContact['how_to_apply'] ?? null;
+            $job['contact_address'] = $parsedContact['address']    ?? null;
 
+            // Metadata
+            $job['source_phone']            = $phone;
+            $job['raw_text']                = $text;
+            $job['parsed_at']               = now()->toDateTimeString();
+            $job['message_id']              = $message['id'] ?? uniqid();
+            $job['extracted_contacts']      = $contactInfo;
+            $job['organizations_mentioned'] = array_unique($organizations);
 
             $this->saveJobToFile($job);
 
@@ -615,11 +615,8 @@ class WhatsAppController extends Controller
                 'body'   => $response->body(),
             ]);
 
-
-
         } catch (\Exception $e) {
             Log::error('Error in handleChannelJob: ' . $e->getMessage());
-            // Save raw message on error
             if (isset($text)) {
                 $this->saveRawJob($text, [], $phone ?? 'unknown');
             }
