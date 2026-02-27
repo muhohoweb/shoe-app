@@ -543,29 +543,30 @@ class WhatsAppController extends Controller
                 'Content-Type' => 'application/json',
             ])->post('https://api.anthropic.com/v1/messages', [
                 'model' => 'claude-3-haiku-20240307',
-                'max_tokens' => 1000,
+                'max_tokens' => 1500,
                 'system' => "You are a Kenyan job posting parser. Extract ALL job details from the text.
+                If the text contains a URL that looks like a careers/jobs/vacancy portal link, treat it as the application link in contact_info.how_to_apply.
                 Return a JSON object with these fields (use null if not found):
                 {
                   \"title\": \"job title/position\",
                   \"organization\": \"employer/hospital/clinic name\",
                   \"location\": \"work location\",
                   \"job_type\": \"full-time/part-time/internship/contract\",
-                  \"description\": \"full job description\",
-                  \"requirements\": [\"array of requirements\"],
-                  \"qualifications\": [\"array of qualifications\"],
-                  \"experience\": \"experience needed\",
-                  \"gender_preference\": \"any gender preference mentioned\",
+                  \"contract_duration\": \"e.g. one-year renewable, permanent, 6-month contract\",
+                  \"description\": \"job summary only, 2-3 sentences max\",
+                  \"responsibilities\": [\"array of key responsibilities\"],
+                  \"requirements\": [\"array of requirements and qualifications combined\"],
                   \"skills\": [\"specific skills required\"],
                   \"contact_info\": {
-                    \"phone\": \"contact phone numbers\",
-                    \"email\": \"contact email\",
-                    \"address\": \"physical address\",
-                    \"how_to_apply\": \"application instructions\"
+                    \"phone\": \"contact phone or null\",
+                    \"email\": \"contact email or null\",
+                    \"address\": \"physical address or null\",
+                    \"how_to_apply\": \"full application instructions including portal URLs, email addresses, or any links to apply\"
                   },
-                  \"salary\": \"any salary information\",
-                  \"deadline\": \"application deadline\"
-                }",
+                  \"salary\": \"any salary information or null\",
+                  \"deadline\": \"application deadline in YYYY-MM-DD format or null\"
+                }
+                No markdown. Return only the JSON object.",
                 'messages' => [
                     ['role' => 'user', 'content' => $text],
                 ],
