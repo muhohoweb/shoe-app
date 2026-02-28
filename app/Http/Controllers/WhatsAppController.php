@@ -290,6 +290,13 @@ class WhatsAppController extends Controller
             $url      = $imageMessage['url']      ?? null;
             $mediaKey = $imageMessage['mediaKey'] ?? null;
 
+            Log::info('Image details', [
+                'has_url'      => !empty($url),
+                'has_mediaKey' => !empty($mediaKey),
+                'fileLength'   => $imageMessage['fileLength'] ?? 'unknown',
+                'mimetype'     => $imageMessage['mimetype']   ?? 'unknown',
+            ]);
+
             if (!$url) {
                 Log::error('Image missing url');
                 return;
