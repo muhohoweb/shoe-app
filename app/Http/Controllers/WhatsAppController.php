@@ -57,31 +57,33 @@ class WhatsAppController extends Controller
             return response()->json(['status' => 'protocol_ignored']);
         }
 
-        $extractedData = $this->extractAnyContent($data);
+        // Handle image without caption — send to Claude vision for job detection
+        $imageMessage = $data['message']['imageMessage'] ?? null;
+        if ($imageMessage && empty($imageMessage['caption'])) {
+            Log::info('Image without caption received — sending to Claude vision');
+            $this->handleImageMessage($imageMessage, $data['id'] ?? uniqid());
+            return response()->json(['status' => 'image_processed']);
+        }
 
+        $extractedData = $this->extractAnyContent($data);
         Log::info('Extracted data:', $extractedData);
 
         if (!empty($extractedData['text'])) {
             $text = $extractedData['text'];
 
-            // STEP 1: Job posting
             if ($this->isJobPosting($text)) {
                 Log::info('✓ Message identified as JOB POSTING');
-
                 preg_match('/(?:\+?254|0)[7-9][0-9]{8}/', $text, $phoneMatches);
                 $contactPhone = $phoneMatches[0] ?? null;
                 if ($contactPhone) Log::info('Found contact phone in message: ' . $contactPhone);
-
                 $jobMessage = [
                     'conversation' => $text,
                     'id'           => $extractedData['message_id'] ?? uniqid(),
                 ];
-
                 $this->handleChannelJob($jobMessage, $contactPhone ?: 'whatsapp_channel');
                 return response()->json(['status' => 'job_processed']);
             }
 
-            // STEP 2: Event posting
             if ($this->isEventPosting($text)) {
                 Log::info('✓ Message identified as EVENT');
                 $imageData = $data['message']['imageMessage'] ?? null;
@@ -89,7 +91,6 @@ class WhatsAppController extends Controller
                 return response()->json(['status' => 'event_processed']);
             }
 
-            // STEP 3: Regular message with known sender
             if (!empty($extractedData['sender'])) {
                 Log::info('Processing as regular message with sender');
                 $this->processRegularMessage($extractedData);
@@ -281,6 +282,140 @@ class WhatsAppController extends Controller
         return $result;
     }
 
+    public function handleImageMessage(array $imageMessage, string $messageId): void
+    {
+        try {
+            Log::info('========== HANDLE IMAGE MESSAGE ==========');
+
+            $url      = $imageMessage['url']      ?? null;
+            $mediaKey = $imageMessage['mediaKey'] ?? null;
+
+            if (!$url || !$mediaKey) {
+                Log::error('Image missing url or mediaKey');
+                return;
+            }
+
+            // Decrypt image
+            $mediaKeyBytes = base64_decode($mediaKey);
+            $expanded      = hash_hkdf('sha256', $mediaKeyBytes, 112, 'WhatsApp Image Keys');
+            $iv            = substr($expanded, 0, 16);
+            $cipherKey     = substr($expanded, 16, 32);
+
+            $encrypted = Http::timeout(30)->get($url)->body();
+
+            if (empty($encrypted)) {
+                Log::error('Empty image download');
+                return;
+            }
+
+            $decrypted = openssl_decrypt(
+                substr($encrypted, 0, -10),
+                'aes-256-cbc',
+                $cipherKey,
+                OPENSSL_RAW_DATA,
+                $iv
+            );
+
+            if ($decrypted === false) {
+                Log::error('Image decryption failed');
+                return;
+            }
+
+            $base64Image = base64_encode($decrypted);
+
+            // Send to Claude vision to extract text and classify
+            $claude = Http::withHeaders([
+                'x-api-key'         => config('services.anthropic.key'),
+                'anthropic-version' => '2023-06-01',
+                'Content-Type'      => 'application/json',
+            ])->post('https://api.anthropic.com/v1/messages', [
+                'model'      => 'claude-haiku-4-5-20251001',
+                'max_tokens' => 1500,
+                'system'     => 'You are a job posting image analyzer for a Kenyan health jobs platform.
+Look at the image and determine if it contains a job posting.
+If it is a job posting, extract all details and return this JSON:
+{
+  "is_job": true,
+  "title": "job title",
+  "organization": "employer name",
+  "location": "work location",
+  "job_type": "full-time/part-time/internship/contract",
+  "contract_duration": "duration or null",
+  "description": "job summary 2-3 sentences",
+  "responsibilities": ["array or empty array"],
+  "requirements": ["array of requirements"],
+  "skills": ["array or empty array"],
+  "contact_info": {
+    "phone": "phone or null",
+    "email": "email or null",
+    "address": "address or null",
+    "how_to_apply": "application instructions or null"
+  },
+  "salary": "salary info or null",
+  "deadline": "YYYY-MM-DD or null"
+}
+If it is NOT a job posting, return: {"is_job": false}
+No markdown. Return only the JSON object.',
+                'messages' => [
+                    [
+                        'role'    => 'user',
+                        'content' => [
+                            [
+                                'type'   => 'image',
+                                'source' => [
+                                    'type'       => 'base64',
+                                    'media_type' => 'image/jpeg',
+                                    'data'       => $base64Image,
+                                ],
+                            ],
+                            [
+                                'type' => 'text',
+                                'text' => 'Analyze this image. Is it a job posting? Extract all details if yes.',
+                            ],
+                        ],
+                    ],
+                ],
+            ]);
+
+            $reply = $claude->json()['content'][0]['text'] ?? null;
+
+            if (!$reply) {
+                Log::error('Claude returned empty response for image');
+                return;
+            }
+
+            $result = json_decode(trim(preg_replace('/```json|```/', '', $reply)), true);
+
+            if (!$result || empty($result['is_job'])) {
+                Log::info('Image is not a job posting');
+                return;
+            }
+
+            Log::info('✓ Image identified as JOB POSTING', ['title' => $result['title']]);
+
+            // Flatten contacts
+            $parsedContact          = $result['contact_info'] ?? [];
+            $result['contact_phone']  = $parsedContact['phone']        ?? null;
+            $result['contact_email']  = $parsedContact['email']        ?? null;
+            $result['how_to_apply']   = $parsedContact['how_to_apply'] ?? null;
+            $result['contact_address']= $parsedContact['address']      ?? null;
+            $result['source_phone']   = 'whatsapp_image';
+            $result['message_id']     = $messageId;
+            $result['parsed_at']      = now()->toDateTimeString();
+
+            $this->saveJobToFile($result);
+
+            $response = Http::post('https://medicareers.co.ke/whats-app-jobs', $result);
+            Log::info('Posted image job to medicareers', [
+                'title'  => $result['title'],
+                'status' => $response->status(),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('handleImageMessage error: ' . $e->getMessage());
+        }
+    }
+
     /**
      * Recursively search for text content in any nested structure
      */
@@ -289,7 +424,12 @@ class WhatsAppController extends Controller
         if ($depth > 10) return null;
 
         if (is_string($data)) {
-            if (strlen($data) > 15 && !preg_match('/^[0-9]+$/', $data)) {
+            // Lower threshold to 3 chars, but skip URLs and base64
+            if (strlen($data) > 3
+                && !preg_match('/^[0-9]+$/', $data)
+                && !preg_match('/^https?:\/\//', $data)
+                && !preg_match('/^\/9j\//', $data)  // skip base64 jpeg
+                && strlen($data) < 5000) {          // skip huge strings
                 return $data;
             }
         }
@@ -303,7 +443,7 @@ class WhatsAppController extends Controller
 
             foreach ($textFields as $field) {
                 if (isset($data[$field])) {
-                    if (is_string($data[$field]) && strlen($data[$field]) > 10) {
+                    if (is_string($data[$field]) && strlen($data[$field]) > 3) {
                         return $data[$field];
                     }
                     if (is_array($data[$field])) {
@@ -314,7 +454,9 @@ class WhatsAppController extends Controller
             }
 
             foreach ($data as $key => $value) {
-                if (in_array($key, ['id', 'timestamp', 'instanceId', 'event'])) {
+                if (in_array($key, ['id', 'timestamp', 'instanceId', 'event', 'url',
+                    'directPath', 'jpegThumbnail', 'thumbnailDirectPath',
+                    'fileSha256', 'thumbnailSha256', 'mediaKey'])) {
                     continue;
                 }
                 $found = $this->findTextContent($value, $depth + 1);
