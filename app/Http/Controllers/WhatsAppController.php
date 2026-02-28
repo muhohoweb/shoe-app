@@ -290,40 +290,51 @@ class WhatsAppController extends Controller
             $url      = $imageMessage['url']      ?? null;
             $mediaKey = $imageMessage['mediaKey'] ?? null;
 
-            if (!$url || !$mediaKey) {
-                Log::error('Image missing url or mediaKey');
+            if (!$url) {
+                Log::error('Image missing url');
                 return;
             }
 
-            // Decrypt image
-            $mediaKeyBytes = base64_decode($mediaKey);
-            $expanded      = hash_hkdf('sha256', $mediaKeyBytes, 112, 'WhatsApp Image Keys');
-            $iv            = substr($expanded, 0, 16);
-            $cipherKey     = substr($expanded, 16, 32);
+            // If no mediaKey, try downloading directly (unencrypted channel images)
+            if (!$mediaKey) {
+                Log::info('No mediaKey — attempting direct download');
+                $response = Http::timeout(30)->get($url);
 
-            $encrypted = Http::timeout(30)->get($url)->body();
+                if (!$response->successful() || empty($response->body())) {
+                    Log::error('Direct image download failed', ['status' => $response->status()]);
+                    return;
+                }
 
-            if (empty($encrypted)) {
-                Log::error('Empty image download');
-                return;
+                $imageData = $response->body();
+            } else {
+                $mediaKeyBytes = base64_decode($mediaKey);
+                $expanded      = hash_hkdf('sha256', $mediaKeyBytes, 112, 'WhatsApp Image Keys');
+                $iv            = substr($expanded, 0, 16);
+                $cipherKey     = substr($expanded, 16, 32);
+
+                $encrypted = Http::timeout(30)->get($url)->body();
+
+                if (empty($encrypted)) {
+                    Log::error('Empty image download');
+                    return;
+                }
+
+                $imageData = openssl_decrypt(
+                    substr($encrypted, 0, -10),
+                    'aes-256-cbc',
+                    $cipherKey,
+                    OPENSSL_RAW_DATA,
+                    $iv
+                );
+
+                if ($imageData === false) {
+                    Log::error('Image decryption failed');
+                    return;
+                }
             }
 
-            $decrypted = openssl_decrypt(
-                substr($encrypted, 0, -10),
-                'aes-256-cbc',
-                $cipherKey,
-                OPENSSL_RAW_DATA,
-                $iv
-            );
+            $base64Image = base64_encode($imageData);
 
-            if ($decrypted === false) {
-                Log::error('Image decryption failed');
-                return;
-            }
-
-            $base64Image = base64_encode($decrypted);
-
-            // Send to Claude vision to extract text and classify
             $claude = Http::withHeaders([
                 'x-api-key'         => config('services.anthropic.key'),
                 'anthropic-version' => '2023-06-01',
@@ -393,15 +404,14 @@ No markdown. Return only the JSON object.',
 
             Log::info('✓ Image identified as JOB POSTING', ['title' => $result['title']]);
 
-            // Flatten contacts
-            $parsedContact          = $result['contact_info'] ?? [];
-            $result['contact_phone']  = $parsedContact['phone']        ?? null;
-            $result['contact_email']  = $parsedContact['email']        ?? null;
-            $result['how_to_apply']   = $parsedContact['how_to_apply'] ?? null;
-            $result['contact_address']= $parsedContact['address']      ?? null;
-            $result['source_phone']   = 'whatsapp_image';
-            $result['message_id']     = $messageId;
-            $result['parsed_at']      = now()->toDateTimeString();
+            $parsedContact           = $result['contact_info'] ?? [];
+            $result['contact_phone'] = $parsedContact['phone']        ?? null;
+            $result['contact_email'] = $parsedContact['email']        ?? null;
+            $result['how_to_apply']  = $parsedContact['how_to_apply'] ?? null;
+            $result['contact_address'] = $parsedContact['address']    ?? null;
+            $result['source_phone']  = 'whatsapp_image';
+            $result['message_id']    = $messageId;
+            $result['parsed_at']     = now()->toDateTimeString();
 
             $this->saveJobToFile($result);
 
@@ -409,6 +419,7 @@ No markdown. Return only the JSON object.',
             Log::info('Posted image job to medicareers', [
                 'title'  => $result['title'],
                 'status' => $response->status(),
+                'body'   => $response->body(),
             ]);
 
         } catch (\Exception $e) {
