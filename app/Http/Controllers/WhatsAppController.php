@@ -501,28 +501,32 @@ No markdown. Return only the JSON object.',
 
         $phone = preg_replace('/@(s\.whatsapp\.net|lid)$/', '', $sender);
 
-        // Your existing dental order handling code
         $cacheKey = "whatsapp_chat_{$phone}";
         $history = cache()->get($cacheKey, []);
         $history[] = ['role' => 'user', 'content' => $text];
 
-        $services = (new DentalService())->getServices();
+        $servicesResponse = Http::withHeaders([
+            'X-API-Key' => 'si.a925149aa5d24b1f830577ca.CsAhojBs8gwEPDDTbZER5ryC2YVI9riCxpbSDqF5yKI',
+            'Content-Type' => 'application/json',
+        ])->get('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/products-services');
 
-        $systemPrompt = "You are a dental lab assistant for Digital Art Dental Studios. 
-    Your job is to collect order details from clients via WhatsApp before placing an order.
-    
-    Available services: " . json_encode($services) . "
-    
-    Follow these steps:
-    1. Greet the client and identify the service they need
-    2. Ask for tooth number if not provided
-    3. Ask for shade if relevant (crowns, veneers)
-    4. Confirm all details with the client
-    5. Once confirmed, respond ONLY with this JSON (no other text):
-    {\"order_ready\":true,\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}
-    
-    Currency is Kenyan Shillings (Ksh). Do NOT use markdown formatting like ** or * in your responses. Use plain text only.
-    Until you have all details, respond conversationally in plain text.";
+        $services = $servicesResponse->successful() ? $servicesResponse->json() : [];
+
+        $systemPrompt = "You are a dental lab assistant for Digital Art Dental Studios.
+Your job is to collect order details from clients via WhatsApp before placing an order.
+
+Available services and restoration methods: " . json_encode($services) . "
+
+Follow these steps:
+1. Greet the client and identify the service they need
+2. Ask for tooth number if not provided
+3. Ask for shade if relevant (crowns, veneers)
+4. Confirm all details with the client
+5. Once confirmed, respond ONLY with this JSON (no other text):
+{\"order_ready\":true,\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}
+
+Currency is Kenyan Shillings (Ksh). Do NOT use markdown formatting like ** or * in your responses. Use plain text only.
+Until you have all details, respond conversationally in plain text.";
 
         $claude = Http::withHeaders([
             'x-api-key' => config('services.anthropic.key'),
@@ -545,9 +549,9 @@ No markdown. Return only the JSON object.',
 
         if (isset($order['order_ready']) && $order['order_ready'] === true) {
             $order['client_phone'] = $phone;
-            Http::post('https://drmorch.medicareers.co.ke/dental/services/order', $order);
+            Http::post('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/orders/intake', $order);
             cache()->forget($cacheKey);
-            $replyMessage = "Order confirmed!\n{$order['service_name']}\nPrice: Ksh " . ($order['price'] * 130) . "\nEstimated delivery: {$order['estimated_days']} days.\nWe will notify you when it is ready!";
+            $replyMessage = "Order confirmed!\n{$order['service_name']}\nPrice: Ksh {$order['price']}\nEstimated delivery: {$order['estimated_days']} days.\nWe will notify you when it is ready!";
         } else {
             $replyMessage = $reply;
         }
