@@ -451,7 +451,7 @@ No markdown. Return only the JSON object.',
 
             foreach ($textFields as $field) {
                 if (isset($data[$field])) {
-                    if (is_string($data[$field]) && strlen($data[$field]) > 3) {
+                    if (is_string($data[$field]) && strlen($data[$field]) > 0) {
                         return $data[$field];
                     }
                     if (is_array($data[$field])) {
