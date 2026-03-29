@@ -483,6 +483,7 @@ No markdown. Return only the JSON object.',
     /**
      * Process regular messages (dental orders, etc.)
      */
+
     private function processRegularMessage(array $extractedData): void
     {
         $text = $extractedData['text'];
@@ -495,57 +496,43 @@ No markdown. Return only the JSON object.',
         }
 
         $phone = preg_replace('/@(s\.whatsapp\.net|lid)$/', '', $sender);
-
-        Log::info('processRegularMessage called', [
-            'text' => $text,
-            'trimmed' => trim($text),
-            'ctype_digit' => ctype_digit(trim($text)),
-            'numberMap' => cache()->get("number_map_{$phone}"),
-        ]);
-
         $cacheKey = "whatsapp_chat_{$phone}";
         $numberMapCacheKey = "number_map_{$phone}";
 
         $history = cache()->get($cacheKey, []);
 
-        // Build number map from API (or reuse cached)
-        $numberMap = cache()->get($numberMapCacheKey);
+        // Always fetch fresh — build and cache numberMap
+        $servicesResponse = Http::withHeaders([
+            'X-API-Key' => config('services.dads.key'),
+            'Content-Type' => 'application/json',
+        ])->get('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/products-services');
 
-        if (!$numberMap) {
-            $servicesResponse = Http::withHeaders([
-                'X-API-Key' => config('services.dads.key'),
-                'Content-Type' => 'application/json',
-            ])->get('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/products-services');
+        $services = $servicesResponse->successful() ? $servicesResponse->json() : [];
 
-            $services = $servicesResponse->successful() ? $servicesResponse->json() : [];
+        $numberMap = [];
+        $counter = 1;
 
-            $numberMap = [];
-            $counter = 1;
-
-            foreach ($services['restorationMethods'] ?? [] as $method) {
-                $numberMap[$counter] = [
-                    'type' => 'restoration',
-                    'category' => $method['category'],
-                    'materials' => $method['materials'],
-                ];
-                $counter++;
-            }
-
-            foreach ($services['serviceCategories'] ?? [] as $category) {
-                foreach ($category['services'] ?? [] as $service) {
-                    $numberMap[$counter] = [
-                        'type' => 'service',
-                        'name' => $service['name'],
-                        'price' => $service['price'],
-                    ];
-                    $counter++;
-                }
-            }
-
-            cache()->put($numberMapCacheKey, $numberMap, now()->addMinutes(30));
+        foreach ($services['restorationMethods'] ?? [] as $method) {
+            $numberMap[$counter++] = [
+                'type' => 'restoration',
+                'category' => $method['category'],
+                'materials' => $method['materials'],
+            ];
         }
 
-        // Intercept numeric input — handle deterministically
+        foreach ($services['serviceCategories'] ?? [] as $category) {
+            foreach ($category['services'] ?? [] as $service) {
+                $numberMap[$counter++] = [
+                    'type' => 'service',
+                    'name' => $service['name'],
+                    'price' => $service['price'],
+                ];
+            }
+        }
+
+        cache()->put($numberMapCacheKey, $numberMap, now()->addMinutes(30));
+
+        // Intercept numeric input before Claude
         $trimmedText = trim($text);
         if (ctype_digit($trimmedText)) {
             $selectedNumber = (int) $trimmedText;
@@ -582,13 +569,11 @@ No markdown. Return only the JSON object.',
             }
         }
 
-        // Build menu text for system prompt
+        // Build menu for Claude system prompt
         $menuText = "*Restorations:*\n";
-        $counter = 1;
         foreach ($numberMap as $num => $item) {
             if ($item['type'] === 'restoration') {
                 $menuText .= "{$num}. {$item['category']}\n";
-                $counter = $num;
             }
         }
         $menuText .= "\n*Other Services:*\n";
@@ -613,7 +598,7 @@ Formatting rules:
 
 Conversation flow:
 1. Greet briefly and immediately show the numbered menu above exactly as written, ending with: Reply with a number to select.
-2. For all other natural language input, respond conversationally and guide them back to the menu if needed
+2. For natural language input, respond conversationally and guide them back to the menu
 3. Ask for tooth number after material is selected (for restorations)
 4. Ask for shade only if crown or veneer
 5. Summarize and ask for confirmation
