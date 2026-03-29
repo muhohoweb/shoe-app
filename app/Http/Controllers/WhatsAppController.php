@@ -506,32 +506,46 @@ No markdown. Return only the JSON object.',
         $history[] = ['role' => 'user', 'content' => $text];
 
         $servicesResponse = Http::withHeaders([
-            'X-API-Key' => 'si.7166103f52361f0c95caa535.SGOANuR89oKDJ6AdKpSTRQn3Ik0CEQ9BFpA0_kUQfWo',
+            'X-API-Key' => config('services.dads.key'),
             'Content-Type' => 'application/json',
         ])->get('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/products-services');
 
         $services = $servicesResponse->successful() ? $servicesResponse->json() : [];
 
+        $menuText = "*Restorations:*\n";
+        foreach ($services['restorationMethods'] ?? [] as $method) {
+            $materials = implode(', ', $method['materials']);
+            $menuText .= "• {$method['category']} ({$materials})\n";
+        }
+
+        $menuText .= "\n*Other Services:*\n";
+        foreach ($services['serviceCategories'] ?? [] as $category) {
+            foreach ($category['services'] ?? [] as $service) {
+                $menuText .= "• {$service['name']} - Ksh {$service['price']}\n";
+            }
+        }
+
         $systemPrompt = "You are a dental lab assistant for Digital Art Dental Studios. Your job is to collect order details from clients via WhatsApp before placing an order.
 
-        Available services and restoration methods: " . json_encode($services) . "
-        
-        Formatting rules:
-        - Use emoji bullets (• or ➤) for lists, NOT markdown asterisks
-        - Use *bold* only for section headers (WhatsApp supports this)
-        - Keep messages short — one question at a time
-        - Never list all services upfront unless asked; ask what they need first
-        
-        Follow these steps:
-        1. Greet briefly and ask what service they need (do NOT list everything)
-        2. Once they mention a service, confirm the specific type (e.g. Zirconia crown?)
-        3. Ask for tooth number
-        4. Ask for shade if relevant (crowns, veneers)
-        5. Summarize and confirm all details
-        6. Once confirmed, respond ONLY with this JSON (no other text):
-        {\"order_ready\":true,\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}
-        
-        Currency is Kenyan Shillings (Ksh).";
+Here is the full services menu:
+{$menuText}
+
+Formatting rules:
+- Use emoji bullets (• or ➤) for lists, NOT markdown asterisks
+- Use *bold* only for section headers (WhatsApp supports this)
+- Keep messages short — one question at a time
+
+Follow these steps:
+1. Greet briefly and ask what service they need
+2. When the client responds to the greeting, show the full menu above exactly as formatted, then ask which they want
+3. Once they pick a service, confirm the specific type/material (e.g. Zirconia crown?)
+4. Ask for tooth number (for restorations)
+5. Ask for shade if relevant (crowns, veneers)
+6. Summarize and confirm all details
+7. Once confirmed, respond ONLY with this JSON (no other text):
+{\"order_ready\":true,\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}
+
+Currency is Kenyan Shillings (Ksh).";
 
         $claude = Http::withHeaders([
             'x-api-key' => config('services.anthropic.key'),
@@ -556,7 +570,7 @@ No markdown. Return only the JSON object.',
             $order['client_phone'] = $phone;
             Http::post('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/orders/intake', $order);
             cache()->forget($cacheKey);
-            $replyMessage = "Order confirmed!\n{$order['service_name']}\nPrice: Ksh {$order['price']}\nEstimated delivery: {$order['estimated_days']} days.\nWe will notify you when it is ready!";
+            $replyMessage = "Order confirmed! ✅\n{$order['service_name']}\nPrice: Ksh {$order['price']}\nEstimated delivery: {$order['estimated_days']} days.\nWe will notify you when it is ready!";
         } else {
             $replyMessage = $reply;
         }
