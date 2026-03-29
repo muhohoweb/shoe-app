@@ -513,39 +513,58 @@ No markdown. Return only the JSON object.',
         $services = $servicesResponse->successful() ? $servicesResponse->json() : [];
 
         $menuText = "*Restorations:*\n";
+        $numberMap = [];
+        $counter = 1;
+
         foreach ($services['restorationMethods'] ?? [] as $method) {
-            $materials = implode(', ', $method['materials']);
-            $menuText .= "• {$method['category']} ({$materials})\n";
+            $numberMap[$counter] = [
+                'type' => 'restoration',
+                'category' => $method['category'],
+                'materials' => $method['materials'],
+            ];
+            $menuText .= "{$counter}. {$method['category']}\n";
+            $counter++;
         }
 
         $menuText .= "\n*Other Services:*\n";
         foreach ($services['serviceCategories'] ?? [] as $category) {
             foreach ($category['services'] ?? [] as $service) {
-                $menuText .= "• {$service['name']} - Ksh {$service['price']}\n";
+                $numberMap[$counter] = [
+                    'type' => 'service',
+                    'name' => $service['name'],
+                    'price' => $service['price'],
+                ];
+                $menuText .= "{$counter}. {$service['name']} - Ksh {$service['price']}\n";
+                $counter++;
             }
         }
 
+        $numberMapJson = json_encode($numberMap);
+
         $systemPrompt = "You are a dental lab assistant for Digital Art Dental Studios. Your job is to collect order details from clients via WhatsApp before placing an order.
 
-Here is the full services menu:
-{$menuText}
-
-Formatting rules:
-- Use emoji bullets (• or ➤) for lists, NOT markdown asterisks
-- Use *bold* only for section headers (WhatsApp supports this)
-- Keep messages short — one question at a time
-
-Follow these steps:
-1. Greet briefly and ask what service they need
-2. When the client responds to the greeting, show the full menu above exactly as formatted, then ask which they want
-3. Once they pick a service, confirm the specific type/material (e.g. Zirconia crown?)
-4. Ask for tooth number (for restorations)
-5. Ask for shade if relevant (crowns, veneers)
-6. Summarize and confirm all details
-7. Once confirmed, respond ONLY with this JSON (no other text):
-{\"order_ready\":true,\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}
-
-Currency is Kenyan Shillings (Ksh).";
+            Here is the numbered services menu to show clients:
+            {$menuText}
+            
+            Here is the mapping of numbers to services (use this to resolve selections):
+            {$numberMapJson}
+            
+            Formatting rules:
+            - Use emoji bullets (• or ➤) for lists, NOT markdown asterisks
+            - Use *bold* only for section headers (WhatsApp supports this)
+            - Keep messages short — one question at a time
+            
+            Follow these steps:
+            1. Greet briefly and ask what service they need
+            2. When the client responds to the greeting, show the numbered menu above, then say: Reply with a number to select.
+            3. When they reply with a number, look up the service in the mapping and confirm it. For restorations, show a numbered list of the available materials for that category and ask them to pick by number
+            4. Ask for tooth number (for restorations)
+            5. Ask for shade if relevant (crowns, veneers)
+            6. Summarize and confirm all details
+            7. Once confirmed, respond ONLY with this JSON (no other text):
+            {\"order_ready\":true,\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}
+            
+            Currency is Kenyan Shillings (Ksh).";
 
         $claude = Http::withHeaders([
             'x-api-key' => config('services.anthropic.key'),
