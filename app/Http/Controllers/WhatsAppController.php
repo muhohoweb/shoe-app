@@ -441,18 +441,8 @@ No markdown. Return only the JSON object.',
     {
         if ($depth > 10) return null;
 
-        if (is_string($data)) {
-            // Lower threshold to 3 chars, but skip URLs and base64
-            if (strlen($data) > 3
-                && !preg_match('/^[0-9]+$/', $data)
-                && !preg_match('/^https?:\/\//', $data)
-                && !preg_match('/^\/9j\//', $data)  // skip base64 jpeg
-                && strlen($data) < 5000) {          // skip huge strings
-                return $data;
-            }
-        }
-
         if (is_array($data)) {
+            // Check priority text fields first before any recursion
             $textFields = [
                 'conversation', 'text', 'body', 'message', 'content',
                 'caption', 'description', 'text_body', 'msg_text',
@@ -471,12 +461,17 @@ No markdown. Return only the JSON object.',
                 }
             }
 
+            // Only recurse into non-metadata keys
+            $skipKeys = [
+                'id', 'timestamp', 'instanceId', 'event', 'url',
+                'directPath', 'jpegThumbnail', 'thumbnailDirectPath',
+                'fileSha256', 'thumbnailSha256', 'mediaKey',
+                'messageContextInfo', 'deviceListMetadata', 'messageSecret',
+                'senderKeyHash', 'recipientKeyHash', 'senderTimestamp', 'recipientTimestamp',
+            ];
+
             foreach ($data as $key => $value) {
-                if (in_array($key, ['id', 'timestamp', 'instanceId', 'event', 'url',
-                    'directPath', 'jpegThumbnail', 'thumbnailDirectPath',
-                    'fileSha256', 'thumbnailSha256', 'mediaKey'])) {
-                    continue;
-                }
+                if (in_array($key, $skipKeys)) continue;
                 $found = $this->findTextContent($value, $depth + 1);
                 if ($found) return $found;
             }
