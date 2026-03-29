@@ -509,6 +509,13 @@ No markdown. Return only the JSON object.',
 
         $services = $servicesResponse->successful() ? $servicesResponse->json() : [];
 
+        Log::info('Services API response', [
+            'status' => $servicesResponse->status(),
+            'successful' => $servicesResponse->successful(),
+            'restorationMethods' => count($services['restorationMethods'] ?? []),
+            'serviceCategories' => count($services['serviceCategories'] ?? []),
+        ]);
+
         $numberMap = [];
         $counter = 1;
 
