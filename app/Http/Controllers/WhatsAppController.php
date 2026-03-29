@@ -502,70 +502,123 @@ No markdown. Return only the JSON object.',
         $phone = preg_replace('/@(s\.whatsapp\.net|lid)$/', '', $sender);
 
         $cacheKey = "whatsapp_chat_{$phone}";
+        $numberMapCacheKey = "number_map_{$phone}";
+
         $history = cache()->get($cacheKey, []);
-        $history[] = ['role' => 'user', 'content' => $text];
 
-        $servicesResponse = Http::withHeaders([
-            'X-API-Key' => config('services.dads.key'),
-            'Content-Type' => 'application/json',
-        ])->get('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/products-services');
+        // Build number map from API (or reuse cached)
+        $numberMap = cache()->get($numberMapCacheKey);
 
-        $services = $servicesResponse->successful() ? $servicesResponse->json() : [];
+        if (!$numberMap) {
+            $servicesResponse = Http::withHeaders([
+                'X-API-Key' => config('services.dads.key'),
+                'Content-Type' => 'application/json',
+            ])->get('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/products-services');
 
-        $menuText = "*Restorations:*\n";
-        $numberMap = [];
-        $counter = 1;
+            $services = $servicesResponse->successful() ? $servicesResponse->json() : [];
 
-        foreach ($services['restorationMethods'] ?? [] as $method) {
-            $numberMap[$counter] = [
-                'type' => 'restoration',
-                'category' => $method['category'],
-                'materials' => $method['materials'],
-            ];
-            $menuText .= "{$counter}. {$method['category']}\n";
-            $counter++;
+            $numberMap = [];
+            $counter = 1;
+
+            foreach ($services['restorationMethods'] ?? [] as $method) {
+                $numberMap[$counter] = [
+                    'type' => 'restoration',
+                    'category' => $method['category'],
+                    'materials' => $method['materials'],
+                ];
+                $counter++;
+            }
+
+            foreach ($services['serviceCategories'] ?? [] as $category) {
+                foreach ($category['services'] ?? [] as $service) {
+                    $numberMap[$counter] = [
+                        'type' => 'service',
+                        'name' => $service['name'],
+                        'price' => $service['price'],
+                    ];
+                    $counter++;
+                }
+            }
+
+            cache()->put($numberMapCacheKey, $numberMap, now()->addMinutes(30));
         }
 
-        $menuText .= "\n*Other Services:*\n";
-        foreach ($services['serviceCategories'] ?? [] as $category) {
-            foreach ($category['services'] ?? [] as $service) {
-                $numberMap[$counter] = [
-                    'type' => 'service',
-                    'name' => $service['name'],
-                    'price' => $service['price'],
+        // Intercept numeric input — handle deterministically
+        $trimmedText = trim($text);
+        if (ctype_digit($trimmedText)) {
+            $selectedNumber = (int) $trimmedText;
+
+            if (isset($numberMap[$selectedNumber])) {
+                $selection = $numberMap[$selectedNumber];
+
+                $history[] = ['role' => 'user', 'content' => $trimmedText];
+                $history[] = [
+                    'role' => 'assistant',
+                    'content' => "User selected option {$selectedNumber}: " . json_encode($selection),
                 ];
-                $menuText .= "{$counter}. {$service['name']} - Ksh {$service['price']}\n";
-                $counter++;
+                cache()->put($cacheKey, $history, now()->addMinutes(30));
+
+                if ($selection['type'] === 'restoration') {
+                    $materialText = "*{$selection['category']} Materials:*\n";
+                    foreach ($selection['materials'] as $i => $material) {
+                        $materialText .= ($i + 1) . ". {$material}\n";
+                    }
+                    $this->sendWhatsAppMessage(new Request([
+                        'phone' => $phone,
+                        'message' => $materialText . "\nReply with a number to select a material.",
+                    ]));
+                    return;
+                }
+
+                if ($selection['type'] === 'service') {
+                    $this->sendWhatsAppMessage(new Request([
+                        'phone' => $phone,
+                        'message' => "You selected *{$selection['name']}* (Ksh {$selection['price']}).\n\nShall I confirm this order?",
+                    ]));
+                    return;
+                }
             }
         }
 
-        $numberMapJson = json_encode($numberMap);
+        // Build menu text for system prompt
+        $menuText = "*Restorations:*\n";
+        $counter = 1;
+        foreach ($numberMap as $num => $item) {
+            if ($item['type'] === 'restoration') {
+                $menuText .= "{$num}. {$item['category']}\n";
+                $counter = $num;
+            }
+        }
+        $menuText .= "\n*Other Services:*\n";
+        foreach ($numberMap as $num => $item) {
+            if ($item['type'] === 'service') {
+                $menuText .= "{$num}. {$item['name']} - Ksh {$item['price']}\n";
+            }
+        }
+
+        $history[] = ['role' => 'user', 'content' => $text];
 
         $systemPrompt = "You are a dental lab assistant for Digital Art Dental Studios. Your job is to collect order details from clients via WhatsApp before placing an order.
 
-        IMPORTANT: Only use the exact services listed below. Never invent or add services not on this list.
-        
-        Here is the numbered services menu — show this EXACTLY to clients, do not modify it:
-        {$menuText}
-        
-        Here is the number-to-service mapping — use this to resolve what the client selected:
-        {$numberMapJson}
-        
-        Formatting rules:
-        - Use *bold* only for section headers
-        - Keep messages short — one question at a time
-        
-        Conversation flow:
-        1. Greet briefly and immediately show the numbered menu above exactly as written, ending with: Reply with a number to select.
-        2. When the client sends ANY single digit or number (e.g. 1, 2, 3), treat it as a menu selection. Look it up in the mapping above and confirm the selection.
-        3. For restorations, show a numbered list of that category's materials from the mapping and ask them to pick by number
-        4. Ask for tooth number
-        5. Ask for shade only if crown or veneer
-        6. Summarize and ask for confirmation
-        7. Once confirmed, respond ONLY with this JSON (no other text):
-        {\"order_ready\":true,\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}
-        
-        Currency is Kenyan Shillings (Ksh).";
+IMPORTANT: Only use the exact services listed below. Never invent or add services.
+
+Numbered menu — show this EXACTLY to clients:
+{$menuText}
+
+Formatting rules:
+- Use *bold* only for section headers
+- Keep messages short — one question at a time
+
+Conversation flow:
+1. Greet briefly and immediately show the numbered menu above exactly as written, ending with: Reply with a number to select.
+2. For all other natural language input, respond conversationally and guide them back to the menu if needed
+3. Ask for tooth number after material is selected (for restorations)
+4. Ask for shade only if crown or veneer
+5. Summarize and ask for confirmation
+6. Once confirmed, respond ONLY with this JSON (no other text):
+{\"order_ready\":true,\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}
+
+Currency is Kenyan Shillings (Ksh).";
 
         $claude = Http::withHeaders([
             'x-api-key' => config('services.anthropic.key'),
@@ -588,8 +641,12 @@ No markdown. Return only the JSON object.',
 
         if (isset($order['order_ready']) && $order['order_ready'] === true) {
             $order['client_phone'] = $phone;
-            Http::post('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/orders/intake', $order);
+            Http::withHeaders([
+                'X-API-Key' => config('services.dads.key'),
+                'Content-Type' => 'application/json',
+            ])->post('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/orders/intake', $order);
             cache()->forget($cacheKey);
+            cache()->forget($numberMapCacheKey);
             $replyMessage = "Order confirmed! ✅\n{$order['service_name']}\nPrice: Ksh {$order['price']}\nEstimated delivery: {$order['estimated_days']} days.\nWe will notify you when it is ready!";
         } else {
             $replyMessage = $reply;
