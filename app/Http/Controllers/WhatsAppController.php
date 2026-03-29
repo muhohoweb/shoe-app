@@ -506,7 +506,7 @@ No markdown. Return only the JSON object.',
         $history[] = ['role' => 'user', 'content' => $text];
 
         $servicesResponse = Http::withHeaders([
-            'X-API-Key' => 'si.a925149aa5d24b1f830577ca.CsAhojBs8gwEPDDTbZER5ryC2YVI9riCxpbSDqF5yKI',
+            'X-API-Key' => 'si.7166103f52361f0c95caa535.SGOANuR89oKDJ6AdKpSTRQn3Ik0CEQ9BFpA0_kUQfWo',
             'Content-Type' => 'application/json',
         ])->get('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/products-services');
 
