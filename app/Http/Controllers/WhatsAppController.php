@@ -501,20 +501,12 @@ No markdown. Return only the JSON object.',
 
         $history = cache()->get($cacheKey, []);
 
-        // Always fetch fresh — build and cache numberMap
         $servicesResponse = Http::withHeaders([
             'X-API-Key' => config('services.dads.key'),
             'Content-Type' => 'application/json',
         ])->get('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/products-services');
 
         $services = $servicesResponse->successful() ? $servicesResponse->json() : [];
-
-        Log::info('Services API response', [
-            'status' => $servicesResponse->status(),
-            'successful' => $servicesResponse->successful(),
-            'restorationMethods' => count($services['restorationMethods'] ?? []),
-            'serviceCategories' => count($services['serviceCategories'] ?? []),
-        ]);
 
         $numberMap = [];
         $counter = 1;
@@ -539,8 +531,36 @@ No markdown. Return only the JSON object.',
 
         cache()->put($numberMapCacheKey, $numberMap, now()->addMinutes(30));
 
-        // Intercept numeric input before Claude
         $trimmedText = trim($text);
+
+        // Check material selection first
+        $pendingRestoration = cache()->get("pending_restoration_{$phone}");
+        if ($pendingRestoration && ctype_digit($trimmedText)) {
+            $materialIndex = (int) $trimmedText - 1;
+            $materials = $pendingRestoration['materials'];
+
+            if (isset($materials[$materialIndex])) {
+                $selectedMaterial = $materials[$materialIndex];
+                $category = $pendingRestoration['category'];
+
+                cache()->forget("pending_restoration_{$phone}");
+
+                $history[] = ['role' => 'user', 'content' => $trimmedText];
+                $history[] = [
+                    'role' => 'assistant',
+                    'content' => "User selected material: {$selectedMaterial} for {$category}",
+                ];
+                cache()->put($cacheKey, $history, now()->addMinutes(30));
+
+                $this->sendWhatsAppMessage(new Request([
+                    'phone' => $phone,
+                    'message' => "You selected *{$category} ({$selectedMaterial})*.\n\nWhich tooth number?",
+                ]));
+                return;
+            }
+        }
+
+        // Intercept main menu numeric input
         if (ctype_digit($trimmedText)) {
             $selectedNumber = (int) $trimmedText;
 
@@ -555,6 +575,11 @@ No markdown. Return only the JSON object.',
                 cache()->put($cacheKey, $history, now()->addMinutes(30));
 
                 if ($selection['type'] === 'restoration') {
+                    cache()->put("pending_restoration_{$phone}", [
+                        'category' => $selection['category'],
+                        'materials' => $selection['materials'],
+                    ], now()->addMinutes(30));
+
                     $materialText = "*{$selection['category']} Materials:*\n";
                     foreach ($selection['materials'] as $i => $material) {
                         $materialText .= ($i + 1) . ". {$material}\n";
@@ -641,6 +666,7 @@ Currency is Kenyan Shillings (Ksh).";
             ])->post('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/orders/intake', $order);
             cache()->forget($cacheKey);
             cache()->forget($numberMapCacheKey);
+            cache()->forget("pending_restoration_{$phone}");
             $replyMessage = "Order confirmed! ✅\n{$order['service_name']}\nPrice: Ksh {$order['price']}\nEstimated delivery: {$order['estimated_days']} days.\nWe will notify you when it is ready!";
         } else {
             $replyMessage = $reply;
