@@ -501,6 +501,13 @@ No markdown. Return only the JSON object.',
 
         $phone = preg_replace('/@(s\.whatsapp\.net|lid)$/', '', $sender);
 
+        Log::info('processRegularMessage called', [
+            'text' => $text,
+            'trimmed' => trim($text),
+            'ctype_digit' => ctype_digit(trim($text)),
+            'numberMap' => cache()->get("number_map_{$phone}"),
+        ]);
+
         $cacheKey = "whatsapp_chat_{$phone}";
         $numberMapCacheKey = "number_map_{$phone}";
 
