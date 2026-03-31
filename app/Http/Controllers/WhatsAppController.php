@@ -664,6 +664,20 @@ Currency is Kenyan Shillings (Ksh).";
                 'X-API-Key' => config('services.dads.key'),
                 'Content-Type' => 'application/json',
             ])->post('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/orders/intake', $order);
+
+            if ($response->successful()) {
+                \Log::info('Order intake success', [
+                    'phone' => $phone,
+                    'service' => $order['service_name'],
+                    'status' => $response->status(),
+                ]);
+            } else {
+                \Log::error('Order intake failed', [
+                    'phone' => $phone,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+            }
             cache()->forget($cacheKey);
             cache()->forget($numberMapCacheKey);
             cache()->forget("pending_restoration_{$phone}");
