@@ -498,8 +498,10 @@ No markdown. Return only the JSON object.',
         $phone = preg_replace('/@(s\.whatsapp\.net|lid)$/', '', $sender);
         $cacheKey = "whatsapp_chat_{$phone}";
         $numberMapCacheKey = "number_map_{$phone}";
+        $stateKey = "chat_state_{$phone}";
 
         $history = cache()->get($cacheKey, []);
+        $chatState = cache()->get($stateKey);
 
         $servicesResponse = Http::withHeaders([
             'X-API-Key' => config('services.dads.key'),
@@ -533,7 +535,7 @@ No markdown. Return only the JSON object.',
 
         $trimmedText = trim($text);
 
-        // Check material selection first
+        // ── Material selection (pending_restoration state) ──────────────────────
         $pendingRestoration = cache()->get("pending_restoration_{$phone}");
         if ($pendingRestoration && ctype_digit($trimmedText)) {
             $materialIndex = (int) $trimmedText - 1;
@@ -544,6 +546,7 @@ No markdown. Return only the JSON object.',
                 $category = $pendingRestoration['category'];
 
                 cache()->forget("pending_restoration_{$phone}");
+                cache()->put($stateKey, 'awaiting_tooth', now()->addMinutes(30));
 
                 $history[] = ['role' => 'user', 'content' => $trimmedText];
                 $history[] = [
@@ -560,8 +563,8 @@ No markdown. Return only the JSON object.',
             }
         }
 
-        // Intercept main menu numeric input
-        if (ctype_digit($trimmedText)) {
+        // ── Main menu numeric intercept — only when NOT mid-conversation ─────────
+        if (ctype_digit($trimmedText) && !in_array($chatState, ['awaiting_tooth', 'awaiting_shade', 'awaiting_confirmation'])) {
             $selectedNumber = (int) $trimmedText;
 
             if (isset($numberMap[$selectedNumber])) {
@@ -592,6 +595,7 @@ No markdown. Return only the JSON object.',
                 }
 
                 if ($selection['type'] === 'service') {
+                    cache()->put($stateKey, 'awaiting_confirmation', now()->addMinutes(30));
                     $this->sendWhatsAppMessage(new Request([
                         'phone' => $phone,
                         'message' => "You selected *{$selection['name']}* (Ksh {$selection['price']}).\n\nShall I confirm this order?",
@@ -601,7 +605,7 @@ No markdown. Return only the JSON object.',
             }
         }
 
-        // Build menu for Claude system prompt
+        // ── Build menu text for Claude system prompt ─────────────────────────────
         $menuText = "*Restorations:*\n";
         foreach ($numberMap as $num => $item) {
             if ($item['type'] === 'restoration') {
@@ -655,32 +659,48 @@ Currency is Kenyan Shillings (Ksh).";
         $history[] = ['role' => 'assistant', 'content' => $reply];
         cache()->put($cacheKey, $history, now()->addMinutes(30));
 
+        // ── Update state based on Claude's reply ─────────────────────────────────
+        if (stripos($reply, 'tooth number') !== false) {
+            cache()->put($stateKey, 'awaiting_tooth', now()->addMinutes(30));
+        } elseif (stripos($reply, 'shade') !== false) {
+            cache()->put($stateKey, 'awaiting_shade', now()->addMinutes(30));
+        } elseif (stripos($reply, 'confirm') !== false || stripos($reply, 'shall i') !== false) {
+            cache()->put($stateKey, 'awaiting_confirmation', now()->addMinutes(30));
+        } else {
+            cache()->forget($stateKey);
+        }
+
+        // ── Handle completed order ────────────────────────────────────────────────
         $cleaned = preg_replace('/```json|```/', '', $reply);
         $order = json_decode(trim($cleaned), true);
 
         if (isset($order['order_ready']) && $order['order_ready'] === true) {
             $order['client_phone'] = $phone;
-            Http::withHeaders([
+
+            $response = Http::withHeaders([
                 'X-API-Key' => config('services.dads.key'),
                 'Content-Type' => 'application/json',
             ])->post('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/orders/intake', $order);
 
             if ($response->successful()) {
-                \Log::info('Order intake success', [
+                Log::info('Order intake success', [
                     'phone' => $phone,
                     'service' => $order['service_name'],
                     'status' => $response->status(),
                 ]);
             } else {
-                \Log::error('Order intake failed', [
+                Log::error('Order intake failed', [
                     'phone' => $phone,
                     'status' => $response->status(),
                     'body' => $response->body(),
                 ]);
             }
+
             cache()->forget($cacheKey);
             cache()->forget($numberMapCacheKey);
             cache()->forget("pending_restoration_{$phone}");
+            cache()->forget($stateKey);
+
             $replyMessage = "Order confirmed! ✅\n{$order['service_name']}\nPrice: Ksh {$order['price']}\nEstimated delivery: {$order['estimated_days']} days.\nWe will notify you when it is ready!";
         } else {
             $replyMessage = $reply;
