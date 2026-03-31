@@ -484,6 +484,7 @@ No markdown. Return only the JSON object.',
      * Process regular messages (dental orders, etc.)
      */
 
+
     private function processRegularMessage(array $extractedData): void
     {
         $text = $extractedData['text'];
@@ -548,10 +549,12 @@ No markdown. Return only the JSON object.',
                 cache()->forget("pending_restoration_{$phone}");
                 cache()->put($stateKey, 'awaiting_tooth', now()->addMinutes(30));
 
-                $history[] = ['role' => 'user', 'content' => $trimmedText];
-                $history[] = [
-                    'role' => 'assistant',
-                    'content' => "User selected material: {$selectedMaterial} for {$category}",
+                // Reset history to only current selection context
+                $history = [
+                    [
+                        'role' => 'assistant',
+                        'content' => "User selected: {$category} ({$selectedMaterial}). I asked for the tooth number.",
+                    ]
                 ];
                 cache()->put($cacheKey, $history, now()->addMinutes(30));
 
@@ -570,14 +573,10 @@ No markdown. Return only the JSON object.',
             if (isset($numberMap[$selectedNumber])) {
                 $selection = $numberMap[$selectedNumber];
 
-                $history[] = ['role' => 'user', 'content' => $trimmedText];
-                $history[] = [
-                    'role' => 'assistant',
-                    'content' => "User selected option {$selectedNumber}: " . json_encode($selection),
-                ];
-                cache()->put($cacheKey, $history, now()->addMinutes(30));
-
                 if ($selection['type'] === 'restoration') {
+                    // Reset history before starting fresh selection flow
+                    cache()->put($cacheKey, [], now()->addMinutes(30));
+
                     cache()->put("pending_restoration_{$phone}", [
                         'category' => $selection['category'],
                         'materials' => $selection['materials'],
@@ -595,7 +594,16 @@ No markdown. Return only the JSON object.',
                 }
 
                 if ($selection['type'] === 'service') {
+                    // Reset history for clean service confirmation flow
+                    $history = [
+                        [
+                            'role' => 'assistant',
+                            'content' => "User selected: {$selection['name']} (Ksh {$selection['price']}). I asked for confirmation.",
+                        ]
+                    ];
+                    cache()->put($cacheKey, $history, now()->addMinutes(30));
                     cache()->put($stateKey, 'awaiting_confirmation', now()->addMinutes(30));
+
                     $this->sendWhatsAppMessage(new Request([
                         'phone' => $phone,
                         'message' => "You selected *{$selection['name']}* (Ksh {$selection['price']}).\n\nShall I confirm this order?",
