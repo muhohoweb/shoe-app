@@ -1237,17 +1237,24 @@ No markdown. Return only the JSON object.',
         $imageUrl = $request->input('image_url');
         $caption = $request->input('caption', '');
 
-        Http::withHeaders([
-            'Authorization' => 'Bearer ' . config('services.whatsapp.token'),
-            'Content-Type' => 'application/json',
-        ])->post('https://graph.facebook.com/v19.0/' . config('services.whatsapp.phone_id') . '/messages', [
-            'messaging_product' => 'whatsapp',
-            'to' => $phone,
-            'type' => 'image',
-            'image' => [
-                'link' => $imageUrl,
-                'caption' => $caption,
+        $response = Http::timeout(5)->withOptions([
+            'curl' => [
+                CURLOPT_RESOLVE => ['api.flaresend.com:443:57.128.52.136'],
             ],
+        ])->withHeaders([
+            'Authorization' => 'Bearer ' . config('services.flaresend.key'),
+            'Content-Type' => 'application/json',
+        ])->post('https://api.flaresend.com/send-message', [
+            'recipients' => [$phone],
+            'type' => 'image',
+            'url' => $imageUrl,
+            'caption' => $caption,
+        ]);
+
+        Log::info('WhatsApp image send', [
+            'phone' => $phone,
+            'status' => $response->status(),
+            'body' => $response->body(),
         ]);
     }
 }
