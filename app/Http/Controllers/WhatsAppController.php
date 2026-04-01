@@ -647,7 +647,7 @@ Conversation flow:
 4. Ask for shade only if crown or veneer
 5. Summarize and ask for confirmation
 6. Once confirmed, respond ONLY with this JSON (no other text):
-{\"order_ready\":true,\"service_name\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}
+{\"order_ready\":true,\"service_name\":\"\",\"material\":\"\",\"tooth_number\":null,\"shade\":null,\"estimated_days\":0,\"price\":0,\"notes\":\"\"}
 
 Currency is Kenyan Shillings (Ksh).";
 
@@ -685,10 +685,24 @@ Currency is Kenyan Shillings (Ksh).";
         if (isset($order['order_ready']) && $order['order_ready'] === true) {
             $order['client_phone'] = $phone;
 
+            $toothNumber = $order['tooth_number'] ?? null;
+            $payload = [
+                'adHocCustomerName'    => 'WhatsApp Client',
+                'adHocCustomerDetails' => "Phone: {$phone}",
+                'teeth'                => $toothNumber
+                    ? [
+                        (string) $toothNumber => [
+                            'category' => $order['service_name'] ?? '',
+                            'material' => $order['shade'] ?? $order['material'] ?? '',
+                        ]
+                    ]
+                    : [],
+            ];
+
             $response = Http::withHeaders([
                 'X-API-Key' => config('services.dads.key'),
                 'Content-Type' => 'application/json',
-            ])->post('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/orders/intake', $order);
+            ])->post('https://dads-seven.vercel.app/api/companies/cmma9kxer0012kya52e8tbim8/orders/intake', $payload);
 
             if ($response->successful()) {
                 Log::info('Order intake success', [
