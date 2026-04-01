@@ -689,6 +689,8 @@ Currency is Kenyan Shillings (Ksh).";
             $payload = [
                 'adHocCustomerName'    => 'WhatsApp Client',
                 'adHocCustomerDetails' => "Phone: {$phone}",
+                "source"=>'WhatsApp',
+                "Notes"=>"Extra Notes",
                 'teeth'                => $toothNumber
                     ? [
                         (string) $toothNumber => [
