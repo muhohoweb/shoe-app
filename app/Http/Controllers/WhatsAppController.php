@@ -549,7 +549,6 @@ No markdown. Return only the JSON object.',
                 cache()->forget("pending_restoration_{$phone}");
                 cache()->put($stateKey, 'awaiting_tooth', now()->addMinutes(30));
 
-                // Reset history to only current selection context
                 $history = [
                     [
                         'role' => 'assistant',
@@ -560,8 +559,15 @@ No markdown. Return only the JSON object.',
 
                 $this->sendWhatsAppMessage(new Request([
                     'phone' => $phone,
-                    'message' => "You selected *{$category} ({$selectedMaterial})*.\n\nWhich tooth number?",
+                    'message' => "You selected *{$category} ({$selectedMaterial})*.\n\nHere is a tooth chart for reference 👇",
                 ]));
+
+                $this->sendWhatsAppImage(new Request([
+                    'phone' => $phone,
+                    'image_url' => 'https://drmorch.medicareers.co.ke/uploads/dental.jpeg',
+                    'caption' => 'Which tooth number?',
+                ]));
+
                 return;
             }
         }
@@ -1223,5 +1229,25 @@ No markdown. Return only the JSON object.',
             ]);
 
         return $response->json();
+    }
+
+    private function sendWhatsAppImage(Request $request): void
+    {
+        $phone = $request->input('phone');
+        $imageUrl = $request->input('image_url');
+        $caption = $request->input('caption', '');
+
+        Http::withHeaders([
+            'Authorization' => 'Bearer ' . config('services.whatsapp.token'),
+            'Content-Type' => 'application/json',
+        ])->post('https://graph.facebook.com/v19.0/' . config('services.whatsapp.phone_id') . '/messages', [
+            'messaging_product' => 'whatsapp',
+            'to' => $phone,
+            'type' => 'image',
+            'image' => [
+                'link' => $imageUrl,
+                'caption' => $caption,
+            ],
+        ]);
     }
 }
